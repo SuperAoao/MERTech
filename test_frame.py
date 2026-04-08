@@ -10,6 +10,9 @@ from function.load_data import *
 import numpy as np
 import random
 import os
+import torch
+import torch.nn.functional as F
+from transformers import Wav2Vec2FeatureExtractor
 
 def start_test():
     def get_random_seed(seed):
@@ -24,7 +27,8 @@ def start_test():
 
     #load model
     model = SSLNet(url=URL, class_num=NUM_LABELS*(MAX_MIDI-MIN_MIDI+1), weight_sum=1, freeze_all=FREEZE_ALL).to(device)
-    state_dict = torch.load('data/model/mul_onset_share_weight_detach_ft(final)/mul_onset_share_weight_detach_ft-MERT-v1-95M/best_e_1970',map_location="cpu")
+    #state_dict = torch.load('data/model/mul_onset_share_weight_detach_ft(final)/mul_onset_share_weight_detach_ft-MERT-v1-95M/best_e_1970',map_location="cpu")
+    state_dict = torch.load('data/model/baseline/best_e_2225',map_location="cpu")
     model.load_state_dict(state_dict)
 
     print('finishing loading model')

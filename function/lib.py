@@ -190,8 +190,16 @@ def extract_notes_original(onsets, frames, onset_threshold=0.5, frame_threshold=
 def compute_metrics_with_note(pred_IPT, tar_IPT, pred_onset, tar_onset):
     metrics = defaultdict(list)
     eps = sys.float_info.epsilon
-    p_ref, i_ref= extract_notes_original(torch.from_numpy(tar_onset).transpose(-1, -2), torch.from_numpy(tar_IPT).transpose(-1, -2))
-    p_est, i_est= extract_notes(torch.from_numpy(pred_onset).transpose(-1, -2), torch.from_numpy(pred_IPT).transpose(-1, -2))
+    # Paper (Li et al., 2023) Section 2.3: onset output does NOT specify IPT type (shape=1),
+    # so reference events must be extracted with single-channel onset + multi-class frames.
+    p_ref, i_ref = extract_notes(
+        torch.from_numpy(tar_onset).transpose(-1, -2),
+        torch.from_numpy(tar_IPT).transpose(-1, -2),
+    )
+    p_est, i_est = extract_notes(
+        torch.from_numpy(pred_onset).transpose(-1, -2),
+        torch.from_numpy(pred_IPT).transpose(-1, -2),
+    )
 
     t_ref, f_ref, tt = notes_to_frames(p_ref, i_ref, tar_IPT.transpose(-1,-2).shape)
     t_est, f_est, ee = notes_to_frames(p_est, i_est, pred_IPT.transpose(-1,-2).shape)
@@ -224,8 +232,16 @@ def compute_metrics_with_note(pred_IPT, tar_IPT, pred_onset, tar_onset):
 def compute_metrics_with_note_no_infer(pred_IPT, tar_IPT, pred_onset, tar_onset):
     metrics = defaultdict(list)
     eps = sys.float_info.epsilon
-    p_ref, i_ref = extract_notes_original(torch.from_numpy(tar_onset).transpose(-1, -2), torch.from_numpy(tar_IPT).transpose(-1, -2))
-    p_est, i_est= extract_notes_original(torch.from_numpy(pred_IPT).transpose(-1, -2), torch.from_numpy(pred_IPT).transpose(-1, -2))
+    # Reference uses shared onset channel (shape=1) per the paper.
+    p_ref, i_ref = extract_notes(
+        torch.from_numpy(tar_onset).transpose(-1, -2),
+        torch.from_numpy(tar_IPT).transpose(-1, -2),
+    )
+    # "no_infer": estimate events purely from IPT activations (treat frames as both onset & sustain).
+    p_est, i_est = extract_notes_original(
+        torch.from_numpy(pred_IPT).transpose(-1, -2),
+        torch.from_numpy(pred_IPT).transpose(-1, -2),
+    )
 
     t_ref, f_ref, tt = notes_to_frames(p_ref, i_ref, tar_IPT.transpose(-1,-2).shape)
     t_est, f_est, ee = notes_to_frames(p_est, i_est, pred_IPT.transpose(-1,-2).shape)

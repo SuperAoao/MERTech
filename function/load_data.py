@@ -8,6 +8,152 @@ from config import *
 import torch
 import torchaudio.transforms as T
 
+def load_test_tracks(wav_dir, csv_dir, group="test"):
+    """
+    Load test set while preserving track boundaries.
+
+    Returns a list of dicts:
+      {
+        "track_id": <file stem>,
+        "audio_path": ...,
+        "csv_path": ...,
+        "X": [chunk_waveform_1, ...],
+        "Y": [chunk_IPT_label_1, ...],      # each: (NUM_LABELS, T_chunk)
+        "Y_p": [chunk_pitch_label_1, ...],  # each: (N_pitch, T_chunk)
+        "Y_o": [chunk_onset_label_1, ...],  # each: (1, T_chunk)
+      }
+    """
+
+    def files(wav_dir, csv_dir, group):
+        flacs = sorted(glob(os.path.join(wav_dir, group, "*.flac")))
+        if len(flacs) == 0:
+            flacs = sorted(glob(os.path.join(wav_dir, group, "*.wav")))
+
+        csvs = sorted(glob(os.path.join(csv_dir, group, "*.csv")))
+        pairs = list(zip(flacs, csvs))
+        if len(pairs) == 0:
+            raise RuntimeError(f"Group {group} is empty")
+        return pairs
+
+    def get_wav(file):
+        sr = SAMPLE_RATE
+        y, sr = librosa.load(file, sr=sr)
+        sampling_rate = sr
+        resample_rate = MERT_SAMPLE_RATE
+        if resample_rate != sampling_rate:
+            print(f"setting rate from {sampling_rate} to {resample_rate}")
+            resampler = T.Resample(sampling_rate, resample_rate)
+        else:
+            resampler = None
+
+        if resampler is None:
+            input_audio = y
+        else:
+            input_audio = resampler(torch.from_numpy(y))
+        return input_audio
+
+    def chunk_data_test(f):
+        s = int(FEATURE_RATE * TIME_LENGTH)
+        xdata = np.transpose(f)  # [time, feat]
+        x = []
+        for i in range(int(np.ceil(len(xdata) / s))):
+            data = xdata[int(i * s) : min(int(i * s + s), len(xdata))]
+            x.append(np.transpose(data[:, :]))
+        return x
+
+    def chunk_wav_test(f):
+        s = int(MERT_SAMPLE_RATE * TIME_LENGTH)
+        xdata = f
+        x = []
+        length = int(np.ceil(len(xdata) / s) * s)
+        app = np.zeros((length - xdata.shape[0]))
+        xdata = np.concatenate((xdata, app), 0)
+        for i in range(int(length / s)):
+            data = xdata[int(i * s) : int(i * s + s)]
+            x.append(data)
+        return x
+
+    def load_all(audio_path, csv_path):
+        saved_data_path = audio_path.replace(".flac", "_multi9898.pt").replace(".wav", "_multi9898.pt")
+        if os.path.exists(saved_data_path):
+            return torch.load(saved_data_path)
+
+        feature = get_wav(audio_path)
+
+        n_steps = int(FEATURE_RATE * len(feature) // MERT_SAMPLE_RATE)
+        n_IPTs = NUM_LABELS
+        n_keys = MAX_MIDI - MIN_MIDI + 1
+
+        technique = {
+            "chanyin": 0,
+            "dianyin": 6,
+            "shanghua": 2,
+            "xiahua": 3,
+            "huazhi": 4,
+            "guazou": 4,
+            "lianmo": 4,
+            "liantuo": 4,
+            "yaozhi": 5,
+            "boxian": 1,
+        }
+
+        IPT_label = np.zeros([n_IPTs, n_steps], dtype=int)
+        pitch_label = np.zeros([n_keys, n_steps], dtype=int)
+        onset_label = np.zeros([1, n_steps], dtype=int)
+
+        with open(csv_path, "r") as f:
+            reader = csv.DictReader(f, delimiter=",")
+            for label in reader:
+                onset = float(label["onset_time"])
+                offset = float(label["offset_time"])
+                IPT = int(technique[label["IPT"]])
+                note = int(label["note"])
+                left = int(round(onset * FEATURE_RATE))
+                onset_right = min(n_steps, left + HOPS_IN_ONSET)
+                frame_right = int(round(offset * FEATURE_RATE))
+                frame_right = min(n_steps, frame_right)
+                fn = int(note) - MIN_MIDI
+                IPT_label[IPT, left:frame_right] = 1
+                pitch_label[fn, left:frame_right] = 1
+                onset_label[0, left:onset_right] = 1
+
+        data = dict(
+            audiuo_path=audio_path,
+            csv_path=csv_path,
+            feature=feature,
+            IPT_label=IPT_label,
+            pitch_label=pitch_label,
+            onset_label=onset_label,
+        )
+        torch.save(data, saved_data_path)
+        return data
+
+    tracks = []
+    pairs = files(wav_dir, csv_dir, group)
+    print(f"Loading 1 group ")
+    for audio_path, csv_path in tqdm(pairs, desc=f"Loading group {group}"):
+        dic = load_all(audio_path, csv_path)
+
+        x_chunks = chunk_wav_test(dic["feature"])
+        y_chunks = chunk_data_test(dic["IPT_label"])
+        y_p_chunks = chunk_data_test(dic["pitch_label"])
+        y_o_chunks = chunk_data_test(dic["onset_label"])
+
+        track_id = os.path.splitext(os.path.basename(audio_path))[0]
+        tracks.append(
+            dict(
+                track_id=track_id,
+                audio_path=audio_path,
+                csv_path=csv_path,
+                X=x_chunks,
+                Y=y_chunks,
+                Y_p=y_p_chunks,
+                Y_o=y_o_chunks,
+            )
+        )
+
+    return tracks
+
 def load(wav_dir, csv_dir, groups, avg=None, std=None):
     #Return a list of [(audio location, corresponding CSV file location), (,),...]
     if std is None:
@@ -34,6 +180,7 @@ def load(wav_dir, csv_dir, groups, avg=None, std=None):
         y, sr = librosa.load(file, sr=sr)
         sampling_rate = sr
         resample_rate = MERT_SAMPLE_RATE
+        print(f'sampling_rate: {sampling_rate}, resample_rate: {resample_rate}')
         if resample_rate != sampling_rate:
             print(f'setting rate from {sampling_rate} to {resample_rate}')
             resampler = T.Resample(sampling_rate, resample_rate)
@@ -105,6 +252,10 @@ def load(wav_dir, csv_dir, groups, avg=None, std=None):
         feature = get_wav(audio_path) #feature's shape(The number of Time frame)
 
         #Load the ground truth label
+        # ao: len(feature)：音频波形的采样点个数（在 get_wav() 里被 resample 到 MERT_SAMPLE_RATE，所以它的单位是“以 MERT_SAMPLE_RATE 为采样率的样本点数”）。
+        # len(feature) // MERT_SAMPLE_RATE：大约等于音频时长（秒）的整数部分（用整除）。
+        # FEATURE_RATE * (len(feature) // MERT_SAMPLE_RATE)：把“秒”乘以每秒多少帧 FEATURE_RATE，得到总帧数。
+        # 外层的 int(...)：确保是整数。
         n_steps = int(FEATURE_RATE*len(feature)//MERT_SAMPLE_RATE)
         n_IPTs = NUM_LABELS
         n_keys = MAX_MIDI - MIN_MIDI + 1
@@ -122,11 +273,11 @@ def load(wav_dir, csv_dir, groups, avg=None, std=None):
                 offset = float(label['offset_time'])
                 IPT = int(technique[label['IPT']])
                 note = int(label['note'])
-                left = int(round(onset * FEATURE_RATE))
+                left = int(round(onset * FEATURE_RATE)) # ao: 第几帧
                 onset_right = min(n_steps, left + HOPS_IN_ONSET)
                 frame_right = int(round(offset * FEATURE_RATE))
-                frame_right = min(n_steps, frame_right)
-                fn = int(note) - MIN_MIDI
+                frame_right = min(n_steps, frame_right) # ao: 结束帧
+                fn = int(note) - MIN_MIDI # ao: 音高
                 IPT_label[IPT, left:frame_right] = 1
                 pitch_label[fn, left:frame_right] = 1
                 onset_label[0, left:onset_right] = 1

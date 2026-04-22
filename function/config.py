@@ -8,6 +8,7 @@ NUM_LABELS = 7 #number of IPTs
 BATCH_SIZE = 10
 SAMPLE_RATE = 44100 #Raw audio sampling rate
 MERT_SAMPLE_RATE = 24000 if "MERT" in URL else 16000 #input audio sampling rate of MERT
+# ao: 75 frames per second
 FEATURE_RATE = 75 # FEATURE_RATE = 1000//ZHEN_LENGTH，Sampling rate of feature extracted from MERT
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TWO_STEP = False # Whether two-step finetuning

@@ -1,0 +1,91 @@
+{
+  "dataset": "CBFdataset",
+  "unit": "player",
+  "players": [
+    "Player1",
+    "Player2",
+    "Player3",
+    "Player4",
+    "Player5",
+    "Player6",
+    "Player7",
+    "Player8",
+    "Player9",
+    "Player10"
+  ],
+  "split_ratio": "8:2",
+  "num_folds": 5,
+  "folds": [
+    {
+      "fold": 1,
+      "train_players": [
+        "Player3",
+        "Player4",
+        "Player5",
+        "Player6",
+        "Player7",
+        "Player8",
+        "Player9",
+        "Player10"
+      ],
+      "test_players": ["Player1", "Player2"]
+    },
+    {
+      "fold": 2,
+      "train_players": [
+        "Player1",
+        "Player2",
+        "Player5",
+        "Player6",
+        "Player7",
+        "Player8",
+        "Player9",
+        "Player10"
+      ],
+      "test_players": ["Player3", "Player4"]
+    },
+    {
+      "fold": 3,
+      "train_players": [
+        "Player1",
+        "Player2",
+        "Player3",
+        "Player4",
+        "Player7",
+        "Player8",
+        "Player9",
+        "Player10"
+      ],
+      "test_players": ["Player5", "Player6"]
+    },
+    {
+      "fold": 4,
+      "train_players": [
+        "Player1",
+        "Player2",
+        "Player3",
+        "Player4",
+        "Player5",
+        "Player6",
+        "Player9",
+        "Player10"
+      ],
+      "test_players": ["Player7", "Player8"]
+    },
+    {
+      "fold": 5,
+      "train_players": [
+        "Player1",
+        "Player2",
+        "Player3",
+        "Player4",
+        "Player5",
+        "Player6",
+        "Player7",
+        "Player8"
+      ],
+      "test_players": ["Player9", "Player10"]
+    }
+  ]
+}
+

@@ -59,6 +59,16 @@ tr_loader = torch.utils.data.DataLoader(Data2Torch2([Xtrs["input_values"], Ytr, 
 va_loader = torch.utils.data.DataLoader(Data2Torch2([Xvas["input_values"], Yva, Yva_p, Yva_o]), **v_kwargs)
 print ('finishing data building...')
 
+print(
+    "[FPT Option A] enabled="
+    + str(USE_FPT)
+    + (
+        f" | levels={FPT_LEVELS} layers={FPT_NUM_LAYERS} heads={FPT_NUM_HEADS} dropout={FPT_DROPOUT}"
+        if USE_FPT
+        else ""
+    )
+)
+
 model = SSLNet(url=URL, class_num=NUM_LABELS*(MAX_MIDI-MIN_MIDI+1),weight_sum=1,freeze_all=FREEZE_ALL).to(device)
 print(type(model))
 print("before modify:")

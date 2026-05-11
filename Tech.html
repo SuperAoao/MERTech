@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tech</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b0d12;
+        --panel: #0f1320;
+        --text: #e7eaf0;
+        --muted: #aab2c5;
+        --link: #7aa2ff;
+        --border: rgba(255, 255, 255, 0.10);
+        --code-bg: rgba(255, 255, 255, 0.06);
+        --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f7f8fb;
+          --panel: #ffffff;
+          --text: #1b2333;
+          --muted: #516079;
+          --link: #2b6fff;
+          --border: rgba(0, 0, 0, 0.10);
+          --code-bg: rgba(0, 0, 0, 0.04);
+          --shadow: 0 10px 30px rgba(18, 38, 63, 0.12);
+        }
+      }
+
+      html, body {
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue",
+          Arial, "Noto Sans", "Liberation Sans", sans-serif;
+        line-height: 1.6;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(10px);
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .topbar-inner {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 12px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand .title {
+        font-weight: 650;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
+      }
+
+      .brand .hint {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      main {
+        max-width: 980px;
+        margin: 18px auto 80px;
+        padding: 0 18px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: var(--shadow);
+      }
+
+      a { color: var(--link); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: color-mix(in srgb, var(--panel) 85%, transparent);
+      }
+
+      pre, code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+          "Courier New", monospace;
+      }
+
+      pre {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 14px;
+        overflow: auto;
+      }
+
+      code {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.15em 0.35em;
+      }
+
+      pre code {
+        background: transparent;
+        border: 0;
+        padding: 0;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        overflow: auto;
+        display: block;
+        margin: 14px 0;
+      }
+      th, td {
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        vertical-align: top;
+      }
+      th { background: color-mix(in srgb, var(--panel) 78%, var(--code-bg)); }
+
+      blockquote {
+        margin: 16px 0;
+        padding: 10px 14px;
+        border-left: 4px solid color-mix(in srgb, var(--link) 65%, transparent);
+        background: color-mix(in srgb, var(--panel) 92%, transparent);
+        border-radius: 10px;
+      }
+
+      hr {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 22px 0;
+      }
+
+      .mermaid {
+        background: color-mix(in srgb, var(--panel) 85%, transparent);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 10px;
+        overflow-x: auto;
+      }
+    </style>
+
+    <script>
+      // Enable LaTeX in the content (the HTML contains raw TeX delimiters).
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\(', '\)']],
+          displayMath: [['$$', '$$'], ['\[', '\]']],
+          processEscapes: true,
+        },
+        options: {
+          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        },
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" crossorigin="anonymous"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.7.0/dist/mermaid.min.js" crossorigin="anonymous"></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="title">Tech</div>
+          <div class="hint">Static HTML (all content embedded)</div>
+        </div>
+      </div>
+    </div>
+
+    <main>
+      <div class="card" id="content"><h1>输出</h1>
+<h2>标签二维数组示意图（5 列时间帧）</h2>
+<p>下面是 <code>function/load_data.py</code> 里生成的几个标签矩阵的<strong>形状与含义示意</strong>：列是时间帧（这里画 5 列：t0–t4），值为 0/1。</p>
+<h3><code>IPT_label</code>：技法类别 × 时间帧（形状约 <code>(NUM_LABELS=7, n_steps)</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>IPT类别(行) \ 时间帧(列)</th>
+<th style="text-align:right">t0</th>
+<th style="text-align:right">t1</th>
+<th style="text-align:right">t2</th>
+<th style="text-align:right">t3</th>
+<th style="text-align:right">t4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>chanyin(0)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+</tr>
+<tr>
+<td>boxian(1)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>shanghua(2)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>xiahua(3)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>huazhi(4)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>yaozhi(5)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>dianyin(6)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+</tbody>
+</table>
+<h3><code>pitch_label</code>：音高bin × 时间帧（形状约 <code>(MAX_MIDI-MIN_MIDI+1, n_steps)</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>音高bin(行) \ 时间帧(列)</th>
+<th style="text-align:right">t0</th>
+<th style="text-align:right">t1</th>
+<th style="text-align:right">t2</th>
+<th style="text-align:right">t3</th>
+<th style="text-align:right">t4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MIDI=36（bin=0）</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>MIDI=37（bin=1）</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>MIDI=38（bin=2）</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>…</td>
+<td style="text-align:right">…</td>
+<td style="text-align:right">…</td>
+<td style="text-align:right">…</td>
+<td style="text-align:right">…</td>
+<td style="text-align:right">…</td>
+</tr>
+<tr>
+<td>MIDI=87（bin=51）</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+</tbody>
+</table>
+<h3><code>onset_label</code>：起音(1行) × 时间帧（形状约 <code>(1, n_steps)</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>onset(行=0) \ 时间帧(列)</th>
+<th style="text-align:right">t0</th>
+<th style="text-align:right">t1</th>
+<th style="text-align:right">t2</th>
+<th style="text-align:right">t3</th>
+<th style="text-align:right">t4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>onset</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+</tbody>
+</table>
+<p>Mertech_technique = {
+'chanyin': 0,  # 颤音 (IsoTech 第1类)
+'boxian': 1,   # 拨弦: 勾、打、抹、托等基础指法 (IsoTech 第8类)
+'shanghua': 2, # 上滑音 (IsoTech 第3类)
+'xiahua': 3,   # 下滑音 (IsoTech 第2类)
+'huazhi': 4,   # 刮奏/花指 (IsoTech 第5类)
+'guazou': 4,   # 刮奏 (IsoTech 第5类)
+'lianmo': 4,   # 连抹 (属于刮奏/流水类技法，归入第5类)
+'liantuo': 4,  # 连托 (属于刮奏/流水类技法，归入第5类)
+'yaozhi': 5,   # 摇指 (IsoTech 第6类)
+'dianyin': 6,  # 点音 (产生波折效果，虽属组合技法，但此处对应序号6)
+}</p>
+<p>IsoTech古筝演奏技法，分为8类，尝试将他们和Mertech对应：
+✅颤音、
+✅上滑音、
+✅下滑音、
+❌回滑音、
+✅刮奏（刮奏、花指）、
+✅摇指、
+❌泛音、
+✅拨弦（勾、打、抹、托……）</p>
+<p><img src="image.png" alt="techiques" /></p>
+<p><img src="https://encrypted-tbn3.gstatic.com/licensed-image?q=tbn:ANd9GcRh_PkLwpxAfzKifzOaIHX42Cey31OwgcxEBmvqyYtvh7kTkXk18CzbN-2lm346VdiIoVVYS-NPj27dw5r1RWrWm9ZxLeRP5uyC3F_5cEq3WHXRn1Q" alt="fq" /></p>
+<h2>Sigmoid</h2>
+<p><img src="https://miro.medium.com/v2/resize:fit:1400/1*7IKvxuXRwK7xYCahL-9yjQ.png" alt="" /></p>
+<h3>Softmax（可学习层权重的归一化）</h3>
+<p>在 <code>function/model.py</code> 的 <code>HuggingfaceFrontend</code> 里，当启用“加权融合隐藏层”（<code>use_last=False</code>）时，会对可学习的 <code>layer_weights</code> 做 <code>softmax</code>，把它们变成所有层的权重分布（每一层的权重和为 1），再用加权求和得到融合后的特征。</p>
+<p>下面用一个“单个时间步 + 小维度”的例子把计算过程写出来。</p>
+<h4>图：从 hidden states 到加权融合</h4>
+<div class="mermaid">
+flowchart LR
+  A[layer_weights logits<br/>z0..zL] --> B[softmax<br/>w0..wL]
+  C[hidden_states<br/>h0,h1,...,hL] --> D[加权求和<br/>h = sum_i wi * hi]
+  B --> D
+</div>
+<h4>输出例子（假设 3 层，hidden_dim=2）</h4>
+<p>假设在某个时间步 t：</p>
+<ul>
+<li>三层 hidden states：
+<ul>
+<li><code>h0 = [1, 2]</code></li>
+<li><code>h1 = [3, 4]</code></li>
+<li><code>h2 = [5, 6]</code></li>
+</ul>
+</li>
+<li>可学习层权重 logits（<code>layer_weights</code>）：
+<ul>
+<li><code>z = [0.0, 1.0, 2.0]</code></li>
+</ul>
+</li>
+</ul>
+<p>softmax 后得到权重（近似）：</p>
+<ul>
+<li><code>w = softmax(z) ≈ [0.0900, 0.2447, 0.6652]</code>（三者和为 1）</li>
+</ul>
+<p>融合后的输出：
+<code>h = 0.0900*h0 + 0.2447*h1 + 0.6652*h2</code></p>
+<p>计算（近似）：</p>
+<ul>
+<li><code>0.0900*[1,2] = [0.0900, 0.1800]</code></li>
+<li><code>0.2447*[3,4] = [0.7341, 0.9788]</code></li>
+<li><code>0.6652*[5,6] = [3.3260, 3.9912]</code></li>
+</ul>
+<p>所以：</p>
+<ul>
+<li><code>h ≈ [4.1501, 5.1500]</code></li>
+</ul>
+<h3>ReLU（分类头里的非线性）</h3>
+<p>在 <code>function/model.py</code> 的 <code>Backend</code> 里，分类头对投影特征先做 <code>Dropout</code>，再过 <code>ReLU</code>（<code>x = self.relu(x)</code>），引入非线性，让后续 <code>Linear</code> 输出 logits 时表达能力更强。</p>
+<h4>图：Dropout + ReLU + Linear 的数据流</h4>
+<div class="mermaid">
+flowchart TD
+  X[proj(x) 得到特征<br/>shape: [B,T,512]] --> D[Dropout(0.2)]
+  D --> R[ReLU(max(0,·))]
+  R --> C[classifier Linear → logits]
+</div>
+<h4>输出例子（ReLU 截断负值）</h4>
+<p>假设分类头在某个位置取到一个向量（ReLU 前）：
+<code>u = [-1.2, 0.3, 2.0, -0.4]</code></p>
+<p>ReLU 后：
+<code>relu(u) = [0, 0.3, 2.0, 0]</code></p>
+<p>然后把这个经过 ReLU 的激活送进 <code>classifier = nn.Linear(512, class_size)</code>，
+得到该时间步、每个类别的 <strong>logits</strong>（再在训练/推理时用 <code>BCEWithLogitsLoss</code> 或 <code>sigmoid</code> 处理为 0~1 概率）。</p>
+<h1>Self-Supervised Learning, SSL</h1>
+<ol>
+<li>核心逻辑：屏蔽与预测 (Masked Language Modeling)
+MERT 借鉴了 BERT（自然语言处理领域）的思想。想象一下，你有一段古筝曲子：</li>
+</ol>
+<p>掩码 (Masking)： 模型会随机把音频序列中的某些片段（比如 15% 的时间切片）给盖住（变成 0 或者噪音）。</p>
+<p>预测 (Prediction)： 模型的任务是根据被盖住片段前后的声音，推断出中间被盖住的部分到底是什么。</p>
+<p>怎么算拟合？
+如果模型能根据上下文“猜”出被盖住的频率分量或特征，说明它已经理解了音乐的统计规律（例如：听到“哆、来”之后，后面大概率跟着“咪”）。</p>
+<ol start="2">
+<li>具体的“拟合目标”：RVQ (残差矢量量化)
+由于原始波形（Raw Waveform）包含太多随机噪声，直接预测波形很难。MERT 的做法是去预测离散化的编码（Codes）。</li>
+</ol>
+<p>量化（Quantization）： 系统预先有一个“密码本”（Codebook），里面存了几千种常见的音频特征片段。</p>
+<p>训练目标： 当一段音频被挡住时，模型输出一个特征向量（Tensor），让这个 Tensor 与那个“密码本”里对应的正确片段越接近越好。</p>
+<p>拟合衡量： 使用 交叉熵损失 (Cross-Entropy Loss)。它不是在拟合“音高”，而是在拟合“这段音频在密码本里最像哪一个索引”。</p>
+<ol start="3">
+<li>多层次的特征提取
+MERT 不仅仅拟合一种特征，它同时拟合多个层级的特征：</li>
+</ol>
+<p>浅层： 拟合频谱特征（类似于音色、频率）。</p>
+<p>深层： 拟合语义特征（类似于曲式、风格）。</p>
+<p>这种“多任务并行”的方式，让它输出的 1024 维 Tensor 包含了极其丰富的信息。</p>
+<h1>Metrics</h1>
+<h2>Precision / Recall / F1（公式）</h2>
+<p>对二分类（0/1）预测，定义：</p>
+<ul>
+<li>(TP)（true positive）：预测为 1 且 GT 为 1</li>
+<li>(TN)（true negative）：预测为 0 且 GT 为 0</li>
+<li>(FP)（false positive）：预测为 1 但 GT 为 0</li>
+<li>(FN)（false negative）：预测为 0 但 GT 为 1</li>
+</ul>
+<p>则：</p>
+<p>$$
+Precision = \frac{TP}{TP + FP}
+$$</p>
+<p>$$
+Recall = \frac{TP}{TP + FN}
+$$</p>
+<p>$$
+F1 = \frac{2 \cdot Precision \cdot Recall}{Precision + Recall}
+= \frac{2TP}{2TP + FP + FN}
+$$</p>
+<p>$$
+Accuracy = \frac{TP + TN}{TP + TN + FP + FN}
+$$</p>
+<h2>micro-F1 / macro-F1（公式）</h2>
+<p>本项目里（以 <code>IPT_label</code> 为例）标签是一个二维 0/1 矩阵：<code>(NUM_LABELS=7, T)</code>；预测 <code>pred_IPT</code> 同形状。每个技法类别相当于一个“二分类任务”，在所有时间帧上统计 TP/FP/FN。</p>
+<h3>micro-F1（先全局加总再算）</h3>
+<p>把所有类别的 TP/FP/FN <strong>先加总</strong>：</p>
+<p>$$
+TP_{\text{micro}}=\sum_{k=1}^{K} TP_k,\quad
+FP_{\text{micro}}=\sum_{k=1}^{K} FP_k,\quad
+FN_{\text{micro}}=\sum_{k=1}^{K} FN_k
+$$</p>
+<p>然后：</p>
+<p>$$
+F1_{\text{micro}} = \frac{2TP_{\text{micro}}}{2TP_{\text{micro}} + FP_{\text{micro}} + FN_{\text{micro}}}
+$$</p>
+<h3>macro-F1（每类先算 F1，再平均）</h3>
+<p>$$
+F1_{\text{macro}} = \frac{1}{K}\sum_{k=1}^{K} F1_k
+$$</p>
+<p>其中 (K=7)（古筝 IPT 类别数）。</p>
+<h2>这些指标各自“侧重”什么</h2>
+<ul>
+<li><strong>Precision（少误报）</strong>：更关心预测为 1 的里面有多少是真的（惩罚 FP）。适合“误报代价高”的场景（例如把不存在的技法/音符报出来很麻烦）。</li>
+<li><strong>Recall（少漏报）</strong>：更关心 GT 为 1 的里面抓到了多少（惩罚 FN）。适合“漏检代价高”的场景（例如漏掉一个真实 onset/技法会影响后续解析）。</li>
+<li><strong>F1（Precision 与 Recall 折中）</strong>：当你同时在意误报和漏报，用一个数平衡两者；比 Accuracy 更适合正负极不均衡（尤其是正例稀疏）的帧级任务。</li>
+<li><strong>Accuracy（总体正确率）</strong>：看所有位置里预测对的比例（TP+TN）。在本项目这种“绝大多数帧都是 0”的任务里，TN 会非常多，Accuracy 可能偏高但不代表模型真的会检测技法/音符（因此常作为辅助指标）。</li>
+<li><strong>micro-F1（大类/高频样本权重更大）</strong>：先把所有类的 TP/FP/FN 汇总再算，等价于按“出现次数/帧数”加权；常反映整体平均表现。</li>
+<li><strong>macro-F1（小类更公平）</strong>：每个类别先算 F1 再平均，每一类权重相同；能更敏感地暴露“某些稀有技法几乎不会”的问题。</li>
+</ul>
+<h2>用本项目的标签矩阵举例（7 类 IPT × 5 帧）</h2>
+<p>假设某个 5 帧片段（t0–t4），GT（<code>target_IPT</code>）与预测（<code>pred_IPT</code>，阈值化后 0/1）如下（只画 3 类，其余 4 类全 0）：</p>
+<p>GT（<code>target_IPT</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>类别 \ 帧</th>
+<th style="text-align:right">t0</th>
+<th style="text-align:right">t1</th>
+<th style="text-align:right">t2</th>
+<th style="text-align:right">t3</th>
+<th style="text-align:right">t4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>chanyin(0)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+</tr>
+<tr>
+<td>boxian(1)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>shanghua(2)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+</tbody>
+</table>
+<p>Pred（<code>pred_IPT</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>类别 \ 帧</th>
+<th style="text-align:right">t0</th>
+<th style="text-align:right">t1</th>
+<th style="text-align:right">t2</th>
+<th style="text-align:right">t3</th>
+<th style="text-align:right">t4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>chanyin(0)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+</tr>
+<tr>
+<td>boxian(1)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>shanghua(2)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">0</td>
+</tr>
+</tbody>
+</table>
+<h3>逐类 TP/FP/FN 与 F1</h3>
+<ul>
+<li>
+<p><strong>chanyin(0)</strong>：</p>
+<ul>
+<li>TP：t2,t4 → 2</li>
+<li>FP：无 → 0</li>
+<li>FN：t3（GT=1 但 Pred=0）→ 1</li>
+<li>(F1_0=\frac{2TP}{2TP+FP+FN}=\frac{4}{4+0+1}=0.8)</li>
+</ul>
+</li>
+<li>
+<p><strong>boxian(1)</strong>：</p>
+<ul>
+<li>GT 全 0，但 Pred 在 t1=1</li>
+<li>TP=0, FP=1, FN=0</li>
+<li>(F1_1=0)</li>
+</ul>
+</li>
+<li>
+<p><strong>shanghua(2)</strong>：</p>
+<ul>
+<li>TP：t1 → 1</li>
+<li>FP：无 → 0</li>
+<li>FN：t2 → 1</li>
+<li>(F1_2=\frac{2}{2+0+1}=0.667)</li>
+</ul>
+</li>
+</ul>
+<p>其余 4 类：GT 与 Pred 都全 0（常见实现会把它们的 F1 记为 0，或在 macro 时跳过“无正例类”，具体取决于指标函数实现）。</p>
+<h3>micro-F1（按所有类别/所有帧汇总）</h3>
+<p>把 7 类都算在内时（这里先只展示上面 3 类的汇总）：</p>
+<ul>
+<li>(TP_{\text{micro}} = 2 + 0 + 1 = 3)</li>
+<li>(FP_{\text{micro}} = 0 + 1 + 0 = 1)</li>
+<li>(FN_{\text{micro}} = 1 + 0 + 1 = 2)</li>
+</ul>
+<p>$$
+F1_{\text{micro}}=\frac{2\cdot 3}{2\cdot 3 + 1 + 2}=\frac{6}{9}=0.667
+$$</p>
+<h3>macro-F1（7 类平均）</h3>
+<p>若把其余 4 类当作 F1=0，则：</p>
+<p>$$
+F1_{\text{macro}}=\frac{F1_0+F1_1+F1_2+0+0+0+0}{7}
+=\frac{0.8+0+0.667}{7}=0.210
+$$</p>
+<p>（注意：macro 的数值会强烈依赖“空类别是否计入平均”的约定；你脚本里是直接把 7 个类别的 F1 相加再除以 7，所以属于“空类也计入”的 macro。）</p>
+<h2>Loss Functions（损失函数）</h2>
+<p>训练时要把模型输出的 logits 与标签做对齐，损失函数（loss）用于衡量“预测离真值有多远”，并指导反向传播更新参数。</p>
+<h3>常见损失函数与适用场景</h3>
+<ol>
+<li>
+<p><strong>交叉熵损失 <code>CrossEntropyLoss</code>（多分类 / 单标签）</strong></p>
+<ul>
+<li>适用：每个样本/时间帧只属于一个类别（互斥 single-label）</li>
+<li>常见输出：softmax 概率或 logits</li>
+</ul>
+</li>
+<li>
+<p><strong>二元交叉熵 <code>BCE</code> / <code>BCEWithLogitsLoss</code>（多标签 / 二分类）</strong></p>
+<ul>
+<li>适用：允许同一时间帧同时出现多个类别（multi-label），每个类别是一组独立的二分类任务</li>
+<li>常见输出：logits（未 sigmoid）</li>
+<li>（<code>BCEWithLogitsLoss</code> 会把 sigmoid + BCE 合并，数值更稳定）</li>
+</ul>
+</li>
+<li>
+<p><strong>均方误差 <code>MSELoss</code>（回归）</strong></p>
+<ul>
+<li>适用：连续数值回归任务（例如预测音高/参数的连续值）</li>
+</ul>
+</li>
+<li>
+<p><strong>Huber / 平滑 L1（回归，抗离群点）</strong></p>
+<ul>
+<li>适用：回归且希望对异常值更鲁棒</li>
+</ul>
+</li>
+<li>
+<p><strong>Focal Loss（类别极度不均衡时）</strong></p>
+<ul>
+<li>适用：正负样本极不均衡，希望更多关注难样本</li>
+<li>也是二分类/多标签任务常用的扩展</li>
+</ul>
+</li>
+</ol>
+<h3>本项目为什么用 <code>BCE</code>（对应当前任务）</h3>
+<p>本项目的输出是 <strong>帧级 0/1 标签矩阵</strong>，例如：</p>
+<ul>
+<li><code>IPT_label</code>：<code>(NUM_LABELS=7, T)</code>，每个 IPT 类别在每帧上是独立的二分类（0 或 1）</li>
+<li><code>pitch_label</code>：<code>(N_pitch=52, T)</code>，同样是每个音高 bin 的独立二分类</li>
+<li><code>onset_label</code>：<code>(1, T)</code>，起音也是二分类（是否发生）</li>
+</ul>
+<p>这种“每个类别是一组独立二分类”的结构，天然对应 <strong>BCE / BCEWithLogitsLoss</strong>：</p>
+<ul>
+<li><strong>输入</strong>：模型输出 logits（不需要你在 forward 里做 sigmoid）</li>
+<li><strong>标签</strong>：0/1</li>
+<li><strong>输出</strong>：每个类别/每个帧的误差，loss 会对这些误差求和/平均</li>
+</ul>
+<p>对应到代码（古筝任务）：</p>
+<ul>
+<li><code>function/lib.py</code> 里的 <code>sp_loss()</code> 使用了 <code>nn.BCEWithLogitsLoss(...)</code></li>
+</ul>
+<p>同时 onset 分支还做了正样本加权（让 onset 更“重要”）：</p>
+<ul>
+<li><code>onset_loss()</code> 里对正样本权重乘了常数（例如 <code>10 * fl_target</code>）</li>
+</ul>
+<p>因此：<strong>BCE 是因为任务本质是 multi-label 的帧级检测（每帧、多类别都可能为 1），而不是互斥分类。</strong></p>
+<h1>Model Design</h1>
+<p>本项目模型实现：<code>function/model.py</code>，核心是 <strong>MERT 特征提取器 + 多任务头（IPT / pitch / onset）+ onset 引导的注意力校正</strong>。</p>
+<h2>从宏观上理解：<code>nn.Module</code> 里的 <code>forward()</code> 是做什么的</h2>
+<p>在 PyTorch 里，<strong><code>forward()</code> 定义了“输入张量如何一步步变成输出张量”</strong>，也就是模型的计算图。</p>
+<ul>
+<li>你平时写的 <code>y = model(x)</code>，实际调用的是 <code>nn.Module.__call__()</code>：
+<ul>
+<li>它会处理 hooks、自动混合精度/一些内部逻辑</li>
+<li>然后再去调用你写的 <code>forward(x)</code></li>
+</ul>
+</li>
+<li>训练时（有梯度）：
+<ul>
+<li><code>forward()</code> 产生输出与 loss</li>
+<li><code>loss.backward()</code> 会沿着 <code>forward()</code> 里记录的计算图反传梯度</li>
+</ul>
+</li>
+<li>推理时（<code>model.eval()</code> + <code>torch.no_grad()</code>）：
+<ul>
+<li>同样跑 <code>forward()</code> 得到输出</li>
+<li>但不构建梯度图，省显存、速度更快</li>
+</ul>
+</li>
+</ul>
+<p>所以：<strong>你把“网络结构 + 张量维度变换 + 多分支逻辑”都写在 <code>forward()</code> 里</strong>。</p>
+<h2>符号与本项目默认数值（方便对照 shape）</h2>
+<ul>
+<li><strong>B</strong>：batch size（训练时 <code>BATCH_SIZE=10</code>，测试脚本常为 1）</li>
+<li><strong>L</strong>：输入波形长度（samples）</li>
+<li><strong>sr</strong>：输入给 MERT 的采样率 <code>MERT_SAMPLE_RATE</code>（默认 24000）</li>
+<li><strong>TIME_LENGTH</strong>：分块秒数（默认 5 秒）</li>
+<li><strong>T</strong>：帧数（time steps），默认 (T = FEATURE_RATE \times TIME_LENGTH = 75 \times 5 = 375)</li>
+<li><strong>D</strong>：MERT hidden dim（<code>MERT-v1-95M</code> 对应 <code>768</code>；<code>330M</code> 对应 <code>1024</code>）</li>
+<li><strong>K</strong>：IPT 类别数（<code>NUM_LABELS=7</code>）</li>
+<li><strong>P</strong>：pitch bin 数（<code>MAX_MIDI-MIN_MIDI+1 = 87-36+1 = 52</code>）</li>
+<li><strong>class_num</strong>：联合输出维度，代码里设为 <code>K * P = 364</code></li>
+</ul>
+<p>当输入是一个 5 秒 chunk 时，波形长度大约：</p>
+<p>$$
+L = sr \times TIME_LENGTH = 24000 \times 5 = 120000
+$$</p>
+<h2>SSLNet：逐层张量 shape（按 forward 顺序）</h2>
+<p>下面的 shape 来自 <code>SSLNet.forward()</code> 的真实计算路径（<code>function/model.py</code>），并用本项目变量解释每一步。</p>
+<h3>Step 0：输入</h3>
+<ul>
+<li><strong>输入波形 <code>x</code></strong>（来自 <code>Wav2Vec2FeatureExtractor</code> 的 <code>input_values</code>）：
+<ul>
+<li>常见 shape：<code>[B, 1, L]</code> 或 <code>[B, L]</code></li>
+<li>代码第一行做了：<code>x = x.squeeze(dim=1)</code>，因此进入 frontend 前变成：
+<ul>
+<li><strong><code>[B, L]</code></strong>（示例：<code>[10, 120000]</code> 或 <code>[1, 120000]</code>）</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>Step 1：HuggingfaceFrontend（MERT）</h3>
+<ul>
+<li><strong>输出隐藏表示 <code>h = frontend(x)</code></strong>：
+<ul>
+<li>shape：<strong><code>[B, T_mert, D]</code></strong></li>
+<li>其中 <code>T_mert</code> 是 MERT 内部下采样后的帧数（由模型结构决定，通常与输入长度成比例）</li>
+<li>示例：<code>[B, T_mert, 768]</code></li>
+</ul>
+</li>
+</ul>
+<h4>我是如何判断 MERT 输出结构/shape 的</h4>
+<p>这部分依据不是“猜”，而是来自 <strong>HuggingFace <code>AutoModel</code> 的返回约定</strong> + <strong>你代码对返回值的访问方式</strong>：</p>
+<ul>
+<li>
+<p><strong>为什么能确定有 <code>last_hidden_state</code> / <code>hidden_states</code></strong></p>
+<ul>
+<li>你的代码显式写了 <code>x = self.model(x, output_hidden_states=True)</code>，并随后访问：
+<ul>
+<li><code>x[&quot;last_hidden_state&quot;]</code></li>
+<li><code>x[&quot;hidden_states&quot;]</code></li>
+</ul>
+</li>
+<li>这说明 MERT 的返回对象是 HuggingFace 标准的 <code>ModelOutput</code>（可用 dict key 取值），并且启用了 <code>hidden_states</code>。</li>
+</ul>
+</li>
+<li>
+<p><strong>为什么能确定是三维 <code>[B, T, D]</code></strong></p>
+<ul>
+<li>HuggingFace 的 encoder 类模型约定 <code>last_hidden_state</code> 为 <strong>(batch, time, hidden_size)</strong>。</li>
+<li>你的后端 <code>Backend</code> 直接接收 <code>frontend</code> 输出并喂给 <code>nn.Linear(self.feature_dim, ...)</code>，因此最后一维必须是 hidden size。</li>
+</ul>
+</li>
+<li>
+<p><strong>为什么能确定 <code>D=768</code>（或 1024）</strong></p>
+<ul>
+<li><code>Backend.__init__()</code> 把 <code>feature_dim</code> 写死为：
+<ul>
+<li>768（<code>encoder_size=12</code>，对应 95M）</li>
+<li>1024（<code>encoder_size=24</code>，对应 330M）</li>
+</ul>
+</li>
+<li>如果 <code>frontend</code> 输出最后一维不是 768/1024，<code>Linear</code> 会维度不匹配直接报错；所以这里是“由后端约束反推”出来的。</li>
+</ul>
+</li>
+<li>
+<p><strong>为什么时间维只写 <code>T_mert</code>，不写死为 375</strong></p>
+<ul>
+<li><code>T=375</code> 来自标签帧率 <code>FEATURE_RATE=75</code> 与 <code>TIME_LENGTH=5</code>，这是 <strong>标签时间分辨率</strong>。</li>
+<li><code>T_mert</code> 来自 MERT 内部下采样后的时间分辨率，两者不一定相等。</li>
+<li>你测试脚本里也专门做了 <code>f_pred[:, :target.shape[-1]]</code> 裁切对齐，说明模型输出时间长度与标签时间长度可能存在差异。</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>说明：你的标签帧率是 <code>FEATURE_RATE=75</code>（即 <code>T=375</code>/5 秒），而 <code>T_mert</code> 是 MERT 的时间分辨率；两者不一定相等，因此测试脚本里会用 <code>f_pred[:, :target.shape[-1]]</code> 做裁切对齐。</p>
+</blockquote>
+<h3>Step 2：Backend（联合输出：IPT×pitch）</h3>
+<ul>
+<li><code>out, feature = backend(h)</code>
+<ul>
+<li><code>backend</code> 的最后一层是 <code>Linear(..., class_num)</code>，因此：</li>
+<li><code>out</code> shape：<strong><code>[B, T_mert, class_num]</code></strong></li>
+<li>本项目 <code>class_num = K*P = 364</code></li>
+<li>示例：<code>[B, T_mert, 364]</code></li>
+</ul>
+</li>
+</ul>
+<h3>Step 3：reshape 成网格（K×P）</h3>
+<ul>
+<li><code>out = out.view(B, T_mert, K, P)</code>
+<ul>
+<li>shape：<strong><code>[B, T_mert, 7, 52]</code></strong></li>
+</ul>
+</li>
+</ul>
+<h3>Step 4：边缘化得到 IPT / pitch logits</h3>
+<ul>
+<li>
+<p><strong>IPT logits</strong>（对 pitch 维求和）：</p>
+<ul>
+<li><code>IPT_pred = sum(out, dim=3)</code></li>
+<li>shape：<strong><code>[B, T_mert, K]</code></strong> → <code>[B, T_mert, 7]</code></li>
+</ul>
+</li>
+<li>
+<p><strong>pitch logits</strong>（对 IPT 维求和）：</p>
+<ul>
+<li><code>pitch_pred = sum(out, dim=2)</code></li>
+<li>shape：<strong><code>[B, T_mert, P]</code></strong> → <code>[B, T_mert, 52]</code></li>
+</ul>
+</li>
+</ul>
+<h3>Step 5：onset 分支 logits</h3>
+<ul>
+<li><code>onset_pred, _ = backend_onset(h)</code>
+<ul>
+<li><code>backend_onset</code> 的输出维度是 1</li>
+<li>shape：<strong><code>[B, T_mert, 1]</code></strong></li>
+</ul>
+</li>
+</ul>
+<h3>Step 6：onset 引导的注意力校正（Attnet）</h3>
+<p>代码里先 stop-gradient，再拼接：</p>
+<ul>
+<li><code>onset_pred_deta = onset_pred.detach()</code>（shape 不变）</li>
+<li><code>IPT_onset_cat = cat(IPT_pred, onset_pred_deta, dim=2)</code>
+<ul>
+<li>shape：<strong><code>[B, T_mert, K+1]</code></strong> → <code>[B, T_mert, 8]</code></li>
+</ul>
+</li>
+<li><code>pitch_onset_cat = cat(pitch_pred, onset_pred_deta, dim=2)</code>
+<ul>
+<li>shape：<strong><code>[B, T_mert, P+1]</code></strong> → <code>[B, T_mert, 53]</code></li>
+</ul>
+</li>
+</ul>
+<p>然后通过 <code>Backend_Attnet</code>（内部是 <code>MultiheadAttention(batch_first=True)</code> + <code>Linear</code>）：</p>
+<ul>
+<li><code>backend_attnet_IPT(IPT_onset_cat)</code> 输出：
+<ul>
+<li>shape：<strong><code>[B, T_mert, K]</code></strong> → <code>[B, T_mert, 7]</code></li>
+</ul>
+</li>
+<li><code>backend_attnet_pitch(pitch_onset_cat)</code> 输出：
+<ul>
+<li>shape：<strong><code>[B, T_mert, P]</code></strong> → <code>[B, T_mert, 52]</code></li>
+</ul>
+</li>
+</ul>
+<h3>Step 7：最终输出布局（转成 <code>[B, C, T]</code>）</h3>
+<p>模型最后转置时间维到最后，便于和标签 <code>(C, T)</code> 对齐：</p>
+<ul>
+<li><code>IPT_pred_out = ... .transpose(-1, -2)</code>
+<ul>
+<li>shape：<strong><code>[B, K, T_mert]</code></strong> → <code>[B, 7, T_mert]</code></li>
+</ul>
+</li>
+<li><code>pitch_pred_out = ... .transpose(-1, -2)</code>
+<ul>
+<li>shape：<strong><code>[B, P, T_mert]</code></strong> → <code>[B, 52, T_mert]</code></li>
+</ul>
+</li>
+<li><code>onset_pred_out = onset_pred.transpose(-1, -2)</code>
+<ul>
+<li>shape：<strong><code>[B, 1, T_mert]</code></strong></li>
+</ul>
+</li>
+</ul>
+<h2>推理阶段为什么还要 sigmoid（与 shape 的关系）</h2>
+<p>模型输出的是 logits，不是概率；评测脚本对每一路都做：</p>
+<ul>
+<li><code>squeeze(0)</code>：batch=1 时从 <code>[1, C, T]</code> 变成 <code>[C, T]</code></li>
+<li><code>sigmoid</code>：把 logits 映射到 <code>[0,1]</code></li>
+<li><code>[:, :target.shape[-1]]</code>：裁到和标签的时间长度一致（标签是 <code>(C, T_gt)</code>）</li>
+</ul>
+<p>这对应你在 <code>test_train_frame_ao</code> 里的处理逻辑。</p>
+<h2><code>function/model.py</code> 各个类的 <code>forward()</code> 分别做什么</h2>
+<p>下面按源码中的类逐个说明（输入 → 处理 → 输出）。</p>
+<h3><code>SSLNet.forward(x)</code></h3>
+<ul>
+<li><strong>输入</strong>：波形 <code>x</code>（常见 <code>[B, 1, L]</code> 或 <code>[B, L]</code>）</li>
+<li><strong>处理</strong>：
+<ul>
+<li><code>squeeze(dim=1)</code>：去掉多余的 channel 维（若存在）→ <code>[B, L]</code></li>
+<li><code>frontend(x)</code>：MERT 提取序列特征 → <code>[B, T_mert, D]</code></li>
+<li><code>backend(h)</code>：输出联合 logits → <code>[B, T_mert, class_num]</code></li>
+<li><code>view(..., K, P)</code>：重排成技法×音高网格 → <code>[B, T_mert, 7, 52]</code></li>
+<li><code>sum(dim=3)</code> 得 IPT logits → <code>[B, T_mert, 7]</code></li>
+<li><code>sum(dim=2)</code> 得 pitch logits → <code>[B, T_mert, 52]</code></li>
+<li><code>backend_onset(h)</code> 得 onset logits → <code>[B, T_mert, 1]</code></li>
+<li><code>detach()</code>：切断 onset 梯度，作为条件特征拼接进其它分支</li>
+<li><code>Backend_Attnet</code>：自注意力校正 IPT/pitch → <code>[B, T_mert, 7]</code> / <code>[B, T_mert, 52]</code></li>
+<li><code>transpose(-1,-2)</code>：把时间维换到最后 → <code>[B, C, T_mert]</code></li>
+</ul>
+</li>
+<li><strong>输出</strong>（logits，未 sigmoid）：
+<ul>
+<li>IPT：<code>[B, 7, T_mert]</code></li>
+<li>pitch：<code>[B, 52, T_mert]</code></li>
+<li>onset：<code>[B, 1, T_mert]</code></li>
+</ul>
+</li>
+</ul>
+<h3><code>HuggingfaceFrontend.forward(x)</code></h3>
+<ul>
+<li><strong>输入</strong>：波形 <code>[B, L]</code></li>
+<li><strong>处理</strong>：
+<ul>
+<li><code>AutoModel(..., output_hidden_states=True)</code>：拿到最后一层与所有层 hidden states</li>
+<li><code>use_last=True</code>：用 <code>last_hidden_state</code>（<code>[B, T_mert, D]</code>）</li>
+<li><code>use_last=False</code>：stack 所有层再用可学习 <code>layer_weights</code> 做层加权融合（权重经 softmax 归一化）</li>
+<li><code>F.pad(..., mode='reflect')</code>：在时间维做 1 帧反射 padding（边界补齐）</li>
+</ul>
+</li>
+<li><strong>输出</strong>：序列特征 <code>h</code>，形状大致 <code>[B, T_mert, D]</code></li>
+</ul>
+<h3><code>Backend.forward(x)</code></h3>
+<ul>
+<li><strong>输入</strong>：序列特征 <code>[B, T, D]</code></li>
+<li><strong>处理</strong>：
+<ul>
+<li><code>Linear(D→512)</code> 投影</li>
+<li>可选 <code>mean</code>（若 <code>frame=False</code>，变 clip-level）</li>
+<li><code>Dropout → ReLU → Linear(512→class_size)</code> 输出 logits</li>
+</ul>
+</li>
+<li><strong>输出</strong>：
+<ul>
+<li>logits：帧级时 <code>[B, T, class_size]</code></li>
+<li>feature：投影后的中间特征（同维度，便于额外使用）</li>
+</ul>
+</li>
+</ul>
+<h3><code>self_attn.forward(x)</code></h3>
+<ul>
+<li><strong>输入</strong>：<code>[B, T, C]</code></li>
+<li><strong>处理</strong>：
+<ul>
+<li><code>MultiheadAttention(x,x,x)</code> 自注意力</li>
+<li>残差：<code>att(x)+x</code></li>
+</ul>
+</li>
+<li><strong>输出</strong>：<code>[B, T, C]</code></li>
+</ul>
+<h3><code>Backend_Attnet.forward(x)</code></h3>
+<ul>
+<li><strong>输入</strong>：
+<ul>
+<li>IPT 路：<code>[B, T, 8]</code>（7 个 IPT + 1 个 onset）</li>
+<li>pitch 路：<code>[B, T, 53]</code>（52 个 pitch + 1 个 onset）</li>
+</ul>
+</li>
+<li><strong>处理</strong>：
+<ul>
+<li>先 <code>self_attn</code> 做时序注意力融合</li>
+<li>再 <code>Linear(feature_dim→class_size)</code> 投影回目标类别数</li>
+</ul>
+</li>
+<li><strong>输出</strong>：
+<ul>
+<li>IPT：<code>[B, T, 7]</code></li>
+<li>pitch：<code>[B, T, 52]</code></li>
+</ul>
+</li>
+</ul>
+</div>
+    </main>
+
+    <script>
+      try {
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+      } catch {}
+      if (window.MathJax?.typesetPromise) {
+        window.MathJax.typesetPromise().catch(() => {});
+      }
+    </script>
+  </body>
+</html>

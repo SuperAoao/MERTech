@@ -21,3 +21,14 @@ DATASET = "Guzheng_Tech99"
 MIN_MIDI = 36 #音域内最低音的midi值 C2 36
 MAX_MIDI = 87 #音域内最高音的midi值 Eb6 87
 HOPS_IN_ONSET = 1 #onset跨越几帧
+
+# --- Optional Feature Pyramid Transformer (Option A) ---
+# Inserts a multi-scale temporal context module between MERT frontend and task heads.
+USE_FPT = True
+# number of pyramid levels (including the finest/original resolution)
+FPT_LEVELS = 3
+# transformer encoder layers per level
+FPT_NUM_LAYERS = 1
+# attention heads (must divide MERT hidden dim: 768/1024)
+FPT_NUM_HEADS = 8
+FPT_DROPOUT = 0.1

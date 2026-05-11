@@ -1,9 +1,98 @@
 import torch.nn.functional as F
 import sys
 sys.path.append('../fun')
+import torch
 from transformers import AutoModel
 from torch import nn
 from config import *
+
+class TemporalPyramidTransformer(nn.Module):
+    """
+    Option A: produce x_fused with same shape as input x: [B, T, D].
+
+    - Build a temporal pyramid by strided conv downsampling over time.
+    - Apply Transformer encoder at each level (cheaper at coarse levels).
+    - Fuse coarse->fine via upsample + residual add.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        num_levels: int = 3,
+        num_layers_per_level: int = 1,
+        nhead: int = 8,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        if num_levels < 1:
+            raise ValueError("num_levels must be >= 1")
+        if d_model % nhead != 0:
+            raise ValueError(f"d_model ({d_model}) must be divisible by nhead ({nhead})")
+
+        self.d_model = d_model
+        self.num_levels = num_levels
+
+        # Downsample along time (T) while keeping channel dim (D).
+        # Operates on [B, D, T] for Conv1d.
+        self.down = nn.ModuleList(
+            [
+                nn.Conv1d(d_model, d_model, kernel_size=3, stride=2, padding=1)
+                for _ in range(num_levels - 1)
+            ]
+        )
+
+        # Per-level Transformer encoders over [B, T_level, D].
+        self.encoders = nn.ModuleList()
+        for _ in range(num_levels):
+            layer = nn.TransformerEncoderLayer(
+                d_model=d_model,
+                nhead=nhead,
+                dim_feedforward=4 * d_model,
+                dropout=dropout,
+                batch_first=True,
+                activation="gelu",
+                norm_first=True,
+            )
+            self.encoders.append(nn.TransformerEncoder(layer, num_layers=num_layers_per_level))
+
+        # Light normalization + residual gating for stability.
+        self.norm_in = nn.LayerNorm(d_model)
+        self.norm_out = nn.LayerNorm(d_model)
+        self.res_gate = nn.Parameter(torch.tensor(0.0))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        x: [B, T, D] -> x_fused: [B, T, D]
+        """
+        if x.dim() != 3:
+            raise ValueError(f"Expected x to be [B, T, D], got shape {tuple(x.shape)}")
+
+        x0 = self.norm_in(x)
+        feats = [x0]
+
+        # Build pyramid
+        h = x0.transpose(1, 2)  # [B, D, T]
+        for down in self.down:
+            h = down(h)  # [B, D, T/2]
+            feats.append(h.transpose(1, 2))  # [B, T_level, D]
+
+        # Intra-level encoding
+        feats = [enc(f) for enc, f in zip(self.encoders, feats)]
+
+        # Top-down fusion (coarse -> fine)
+        fused = feats[-1]
+        for lvl in range(self.num_levels - 2, -1, -1):
+            target_len = feats[lvl].shape[1]
+            # Upsample coarse sequence to match fine length.
+            up = F.interpolate(
+                fused.transpose(1, 2), size=target_len, mode="linear", align_corners=False
+            ).transpose(1, 2)
+            fused = feats[lvl] + up
+
+        # Residual: keep original x accessible; gate controls how much FPT changes x.
+        x_fused = self.norm_out(x + torch.tanh(self.res_gate) * fused)
+        return x_fused
+
 
 class SSLNet(nn.Module):
     def __init__(self,
@@ -17,6 +106,19 @@ class SSLNet(nn.Module):
         self.url = url
         encode_size = 24 if "330M" in self.url else 12
         self.frontend = HuggingfaceFrontend(url=self.url, use_last=(1-weight_sum), encoder_size=encode_size, freeze_all=freeze_all)
+
+        # Optional Feature Pyramid Transformer (Option A): x -> x_fused (same shape)
+        feature_dim = 1024 if encode_size == 24 else 768
+        self.fpt = None
+        if USE_FPT:
+            self.fpt = TemporalPyramidTransformer(
+                d_model=feature_dim,
+                num_levels=FPT_LEVELS,
+                num_layers_per_level=FPT_NUM_LAYERS,
+                nhead=FPT_NUM_HEADS,
+                dropout=FPT_DROPOUT,
+            )
+
         self.backend = Backend(class_num, encoder_size=encode_size)
         self.backend_onset = Backend(1, encoder_size=encode_size)
         self.backend_attnet_IPT =Backend_Attnet(NUM_LABELS,NUM_LABELS+1)
@@ -24,7 +126,9 @@ class SSLNet(nn.Module):
 
     def forward(self, x):
         x = x.squeeze(dim=1)
-        x = self.frontend(x)
+        x = self.frontend(x)  # [B, T_mert, D]
+        if self.fpt is not None:
+            x = self.fpt(x)  # [B, T_mert, D] (x_fused)
         out, feature = self.backend(x) #[batch, time, class_num]
         sizes = out.size()
         out = out.view(sizes[0], sizes[1], NUM_LABELS, MAX_MIDI - MIN_MIDI + 1)

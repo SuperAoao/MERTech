@@ -67,6 +67,7 @@ print(
         if USE_FPT
         else ""
     )
+    + f" | early_stop={ENABLE_EARLY_STOPPING} best_metric={BEST_CHECKPOINT_METRIC}"
 )
 
 model = SSLNet(url=URL, class_num=NUM_LABELS*(MAX_MIDI-MIN_MIDI+1),weight_sum=1,freeze_all=FREEZE_ALL).to(device)

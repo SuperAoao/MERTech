@@ -14,13 +14,7 @@ device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TWO_STEP = False # Whether two-step finetuning
 LIN_EPOCH = 5 #If fine-tuning is done in two steps, which epochs should we start fine-tuning the pre-trained model
 FREEZE_ALL = False # Whether to freeze all parameters of the self-supervised pre-training model
-EARLY_STOPPING = 1000 #early_stopping
-saveName = "mul_onset7_pitch_IPT_share_weight_weighted_loss-" + URL.split("/")[-1] #name of the model to save and load
-DATASET = "Guzheng_Tech99"
-
-MIN_MIDI = 36 #音域内最低音的midi值 C2 36
-MAX_MIDI = 87 #音域内最高音的midi值 Eb6 87
-HOPS_IN_ONSET = 1 #onset跨越几帧
+EARLY_STOPPING = 1000  # patience in epochs (only used when ENABLE_EARLY_STOPPING is True)
 
 # --- Optional Feature Pyramid Transformer (Option A) ---
 # Inserts a multi-scale temporal context module between MERT frontend and task heads.
@@ -32,3 +26,19 @@ FPT_NUM_LAYERS = 1
 # attention heads (must divide MERT hidden dim: 768/1024)
 FPT_NUM_HEADS = 8
 FPT_DROPOUT = 0.1
+
+# Baseline (USE_FPT=False): same as original trainer — early stopping on IPT frame F1, best ckpt = IPT.
+# FPT (USE_FPT=True): no early stop (full epoch budget); best ckpt = mean(IPT F1, pitch F1).
+if USE_FPT:
+    ENABLE_EARLY_STOPPING = False
+    BEST_CHECKPOINT_METRIC = "combined"
+else:
+    ENABLE_EARLY_STOPPING = True
+    BEST_CHECKPOINT_METRIC = "ipt"
+
+saveName = "mul_onset7_pitch_IPT_share_weight_weighted_loss-" + URL.split("/")[-1] #name of the model to save and load
+DATASET = "Guzheng_Tech99"
+
+MIN_MIDI = 36 #音域内最低音的midi值 C2 36
+MAX_MIDI = 87 #音域内最高音的midi值 Eb6 87
+HOPS_IN_ONSET = 1 #onset跨越几帧

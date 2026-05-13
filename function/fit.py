@@ -11,6 +11,22 @@ from visdom import Visdom
 from glob import glob
 import os
 
+
+def _validation_score_for_checkpoint(eva_result):
+    """Map Tester output to a single scalar for best checkpoint + early stopping."""
+    m = BEST_CHECKPOINT_METRIC.lower()
+    if m == "pitch":
+        return float(eva_result[7])
+    if m == "combined":
+        return (float(eva_result[3]) + float(eva_result[7])) / 2.0
+    if m != "ipt":
+        print(
+            "Warning: unknown BEST_CHECKPOINT_METRIC=%r; using ipt"
+            % (BEST_CHECKPOINT_METRIC,)
+        )
+    return float(eva_result[3])
+
+
 class Trainer:
     def __init__(self, model, lr, epoch, save_fn, validation_interval, save_interval):
         self.epoch = epoch
@@ -76,8 +92,8 @@ class Trainer:
         viz.line([[0.]], [0], win="pitch_recall_" + saveName, opts=dict(title="pitch_recall_" + saveName, legend=['valid_pitch_recall']))
         viz.line([[0.]], [0], win="pitch_F1_" + saveName, opts=dict(title="pitch_F1_" + saveName, legend=['valid_pitch_F1']))
         viz.line([[0., 0.]], [0], win="onset_loss_" + saveName, opts=dict(title="onset_loss_" + saveName, legend=['train_loss', 'valid_loss']))
-        best_acc = 0
-        last_best_epoch = 1 #for early stopping
+        best_acc = 0.0
+        last_best_epoch = 1  # for early stopping
 
         for e in range(1, self.epoch+1):
             # Wheter there is a two-step fine-tuning process
@@ -151,8 +167,13 @@ class Trainer:
                 viz.line([[float(loss_total_o / len(tr_loader.dataset)), float(eva_result[8])]], [e - 1], win="onset_loss_" + saveName, update='append')
                 print("IPT_F1:", eva_result[3])
                 print("pitch_F1:", eva_result[7])
-                if eva_result[3] > best_acc:
-                    best_acc = eva_result[3]
+                score = _validation_score_for_checkpoint(eva_result)
+                print(
+                    "best_ckpt_metric (%s): %f"
+                    % (BEST_CHECKPOINT_METRIC, score)
+                )
+                if score > best_acc:
+                    best_acc = score
                     last_best_epoch = e
 
                     rm_lst = glob(self.save_fn + 'best_*')
@@ -160,7 +181,9 @@ class Trainer:
                         os.remove(p)
                     torch.save(self.model.state_dict(), self.save_fn + 'best'+'_e_%d'%(e-1))
                 else:
-                    if e-last_best_epoch >= EARLY_STOPPING:
+                    if ENABLE_EARLY_STOPPING and (
+                        e - last_best_epoch >= EARLY_STOPPING
+                    ):
                         print('Early stopping at epoch {}...'.format(e + 1))
                         break
 

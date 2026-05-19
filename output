@@ -1,0 +1,125 @@
+# test_train_frame_ao - Fixed index error
+(guzheng) aozhang@Aos-MacBook-Air MERTech % python3 test_train_frame_ao
+url is： m-a-p/MERT-v1-95M
+/opt/anaconda3/envs/guzheng/lib/python3.8/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+WARNING: feature_extractor_cqt requires the libray 'nnAudio'
+finishing loading model
+Loading 1 group 
+Loading group test: 100%|██████████████████████████████████████████████████████████████| 10/10 [00:00<00:00, 88.29it/s]
+Start chunking data~~~
+len(Xte): 188
+len(Yte): 188
+len(Yte_p): 188
+len(Yte_o): 188
+finishing loading dataset
+start predicting...
+/opt/anaconda3/envs/guzheng/lib/python3.8/site-packages/torch/nn/functional.py:1944: UserWarning: nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.
+  warnings.warn("nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.")
+The result before post-processing：
+IPT_frame_precision: [0.17131168868715488]
+IPT_frame_recall: [0.7803898327406822]
+IPT_frame_f1: [0.28094922004646544]
+IPT_frame_accuracy: [0.16343276378028768]
+IPT_note_precision: [0.2956636005256242]
+IPT_note_recall: [0.1524390243902439]
+IPT_note_f1: [0.20116227089852481]
+The result after post-processing：
+IPT_frame_precision: [0.16774164244186046]
+IPT_frame_recall: [0.7295535361517187]
+IPT_frame_f1: [0.2727675603811213]
+IPT_frame_accuracy: [0.15792174470814624]
+IPT_note_precision: [0.15250836120401337]
+IPT_note_recall: [0.15447154471544716]
+IPT_note_f1: [0.1534836755301245]
+vibrato_frame_f1: [0.7717868338557994]
+vibrato_note_f1: [0.2676056338028169]
+plucks_frame_f1: [0.9477719112988385]
+plucks_note_f1: [0.8249703674436981]
+UP_frame_f1: [0.7027693687633143]
+UP_note_f1: [0.08057179987004548]
+DP_frame_f1: [0.3499402152251894]
+DP_note_f1: [0.021447721179624665]
+glissando_frame_f1: [0.49746926970354305]
+glissando_note_f1: [0.12809131261889664]
+tremolo_frame_f1: [0.4712408759124088]
+tremolo_note_f1: [0.005372733378106111]
+PN_frame_f1: [0.3237781954887219]
+PN_note_f1: [0.025418060200668897]
+macro_frame_f1: 0.5806795243211165
+macro_note_f1: 0.19335394692769386
+
+# Fixed reference extraction error
+guzheng) aozhang@Aos-MacBook-Air MERTech % python3 test_train_frame_ao
+url is： m-a-p/MERT-v1-95M
+/opt/anaconda3/envs/guzheng/lib/python3.8/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+WARNING: feature_extractor_cqt requires the libray 'nnAudio'
+finishing loading model
+Loading 1 group 
+Loading group test: 100%|█████████████████████████████████████████████████████████████| 10/10 [00:00<00:00, 180.69it/s]
+Start chunking data~~~
+len(Xte): 188
+len(Yte): 188
+len(Yte_p): 188
+len(Yte_o): 188
+finishing loading dataset
+start predicting...
+/opt/anaconda3/envs/guzheng/lib/python3.8/site-packages/torch/nn/functional.py:1944: UserWarning: nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.
+  warnings.warn("nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.")
+The result before post-processing：
+IPT_frame_precision: [0.920494955043511]
+IPT_frame_recall: [0.896582797122059]
+IPT_frame_f1: [0.9083815379348223]
+IPT_frame_accuracy: [0.8321419703879879]
+IPT_note_precision: [0.7477003942181341]
+IPT_note_recall: [0.37782204515272244]
+IPT_note_f1: [0.501985002205558]
+The result after post-processing：
+IPT_frame_precision: [0.9331546753875969]
+IPT_frame_recall: [0.8677893076890585]
+IPT_frame_f1: [0.899285771607415]
+IPT_frame_accuracy: [0.8170020414114902]
+IPT_note_precision: [0.9163879598662207]
+IPT_note_recall: [0.9096945551128818]
+IPT_note_f1: [0.9130289903365544]
+vibrato_frame_f1: [0.7972948537123431]
+vibrato_note_f1: [0.8]
+plucks_frame_f1: [0.9489636209813874]
+plucks_note_f1: [0.9526515151515152]
+UP_frame_f1: [0.827039873250594]
+UP_note_f1: [0.887218045112782]
+DP_frame_f1: [0.8184383819379115]
+DP_note_f1: [0.7741935483870969]
+glissando_frame_f1: [0.9737774627923459]
+glissando_note_f1: [0.96]
+tremolo_frame_f1: [0.8192893401015228]
+tremolo_note_f1: [0.33333333333333337]
+PN_frame_f1: [0.4799437016185786]
+PN_note_f1: [0.5098039215686275]
+macro_frame_f1: 0.8092496049135262
+macro_note_f1: 0.7453143376504793
+
+
+fpt 2950
+home/azha0131/miniconda3/envs/guzheng/lib/python3.8/site-packages/hugging
+vibrato_note_f1: [0.7719298245614036]
+plucks_frame_f1: [0.9346460262970399]
+plucks_note_f1: [0.9355769230769232]
+glissando_note_f1: [0.9005235602094241]
+/home/azha0131/miniconda3/envs/guzheng/lib/python3.8/site-packages/hugging
+vibrato_note_f1: [0.780045351473923]
+plucks_frame_f1: [0.9374973225378058]
+plucks_note_f1: [0.9423535016674607]
+UP_frame_f1: [0.7851002865329513]
+UP_note_f1: [0.8372093023255813]
+DP_frame_f1: [0.6478555304740407]
+DP_note_f1: [0.7200000000000001]
+glissando_frame_f1: [0.9307909604519774]
+glissando_note_f1: [0.9238578680203046]
+tremolo_frame_f1: [0.8979591836734694]
+tremolo_note_f1: [0.23076923076923075]
+PN_frame_f1: [0.3980654761904763]
+PN_note_f1: [0.36363636363636365]
+macro_frame_f1: 0.766917029855807
+macro_note_f1: 0.685410231127552

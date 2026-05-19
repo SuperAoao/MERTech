@@ -42,3 +42,9 @@ DATASET = "Guzheng_Tech99"
 MIN_MIDI = 36 #音域内最低音的midi值 C2 36
 MAX_MIDI = 87 #音域内最高音的midi值 Eb6 87
 HOPS_IN_ONSET = 1 #onset跨越几帧
+
+# Per-epoch IPT validation callback (frame / event MI-F1 & MA-F1)
+EVAL_ONSET_THRESHOLD = 0.5
+EVAL_FRAME_THRESHOLD = 0.5
+EVAL_ONSET_TOLERANCE = 0.05
+EVAL_EVENT_GAP_SECONDS = 1.0

@@ -27,14 +27,18 @@ FPT_NUM_LAYERS = 1
 FPT_NUM_HEADS = 8
 FPT_DROPOUT = 0.1
 
-# Baseline (USE_FPT=False): same as original trainer — early stopping on IPT frame F1, best ckpt = IPT.
-# FPT (USE_FPT=True): no early stop (full epoch budget); best ckpt = mean(IPT F1, pitch F1).
+# Baseline (USE_FPT=False): early stopping on IPT frame F1.
+# FPT (USE_FPT=True): early stopping on combined score (includes note / macro_note).
 if USE_FPT:
-    ENABLE_EARLY_STOPPING = False
+    ENABLE_EARLY_STOPPING = True
     BEST_CHECKPOINT_METRIC = "combined"
 else:
     ENABLE_EARLY_STOPPING = True
     BEST_CHECKPOINT_METRIC = "ipt"
+
+# Training loss: loss + PITCH_LOSS_WEIGHT * loss_p + ONSET_LOSS_WEIGHT * loss_o
+PITCH_LOSS_WEIGHT = 0.5
+ONSET_LOSS_WEIGHT = 1.0
 
 saveName = "mul_onset7_pitch_IPT_share_weight_weighted_loss-" + URL.split("/")[-1] #name of the model to save and load
 DATASET = "Guzheng_Tech99"
@@ -48,3 +52,16 @@ EVAL_ONSET_THRESHOLD = 0.5
 EVAL_FRAME_THRESHOLD = 0.5
 EVAL_ONSET_TOLERANCE = 0.05
 EVAL_EVENT_GAP_SECONDS = 1.0
+
+# Per-class threshold sweep on validation (onset_th x frame_th grid)
+THRESHOLD_SWEEP_VALUES = [0.3, 0.4, 0.5, 0.6]
+THRESHOLD_SWEEP_EVERY_EPOCH = True
+# None = sweep all 7 IPT classes; or e.g. [5, 6] for scarce classes only
+THRESHOLD_SWEEP_FOCUS_CLASSES = None
+
+# Failure-mode plots: high frame F1 but low event F1
+FAILURE_INSPECTION = True
+FAILURE_FRAME_F1_MIN = 0.8
+FAILURE_EVENT_F1_MAX = 0.4
+FAILURE_MAX_PLOTS_PER_CLASS = 3
+FAILURE_FOCUS_CLASSES = [5, 6]

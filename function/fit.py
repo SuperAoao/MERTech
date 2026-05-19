@@ -11,19 +11,30 @@ from visdom import Visdom
 from glob import glob
 import os
 from metrics_ipt import (
-    evaluate_ipt_chunks,
-    format_ipt_metrics_report,
+    run_full_validation_metrics,
+    format_full_evaluation_report,
     append_metrics_jsonl,
 )
+from failure_inspection import record_failure_modes
 
 
-def _validation_score_for_checkpoint(eva_result):
-    """Map Tester output to a single scalar for best checkpoint + early stopping."""
+def _validation_score_for_checkpoint(eva_result, val_bundle):
+    """
+    Combined checkpoint score (when BEST_CHECKPOINT_METRIC == 'combined'):
+      mean of legacy IPT frame F1, pitch frame F1, joint note F1 (after post-proc),
+      and macro_note_f1 (mean per-class note F1 after post-proc).
+    """
     m = BEST_CHECKPOINT_METRIC.lower()
     if m == "pitch":
         return float(eva_result[7])
     if m == "combined":
-        return (float(eva_result[3]) + float(eva_result[7])) / 2.0
+        prepost = val_bundle["prepost"]
+        return (
+            float(eva_result[3])
+            + float(eva_result[7])
+            + float(prepost["after"]["note_f1"])
+            + float(prepost["macro_note_f1"])
+        ) / 4.0
     if m != "ipt":
         print(
             "Warning: unknown BEST_CHECKPOINT_METRIC=%r; using ipt"
@@ -41,11 +52,13 @@ class Trainer:
         self.validation_interval = validation_interval
         self.save_interval = save_interval
         self.metrics_log_path = os.path.join(save_fn, "ipt_metrics.jsonl")
+        self.failure_dir = os.path.join(save_fn, "failure_inspection")
+        self.best_frame_th_per_class = [EVAL_FRAME_THRESHOLD] * NUM_LABELS
+        self.best_onset_th_per_class = [EVAL_ONSET_THRESHOLD] * NUM_LABELS
 
-    def evaluate_epoch(self, loader, b_size, we):
+    def evaluate_epoch(self, loader, b_size, we, epoch: int = 0):
         """
-        Run validation: losses, legacy frame F1 (mir_eval multipitch), pitch F1,
-        and IPT frame/event MI-F1 & MA-F1 per class.
+        Validation: losses, legacy frame F1, full IPT bundle (sweep + pre/post note).
         """
         all_pred = np.zeros((b_size, NUM_LABELS, int(LENGTH)))
         all_tar = np.zeros((b_size, NUM_LABELS, int(LENGTH)))
@@ -109,16 +122,48 @@ class Trainer:
         metrics = compute_metrics(pred_inst, tar_inst_bin)
         metrics_pitch = compute_pitch_metrics(pred_pitch, tar_pitch)
 
-        ipt_metrics = evaluate_ipt_chunks(
+        do_sweep = THRESHOLD_SWEEP_EVERY_EPOCH
+        val_bundle = run_full_validation_metrics(
             pred_ipt_chunks,
             tar_ipt_chunks,
             pred_onset_chunks,
             tar_onset_chunks,
-            onset_th=EVAL_ONSET_THRESHOLD,
-            frame_th=EVAL_FRAME_THRESHOLD,
+            do_threshold_sweep=do_sweep,
             onset_tolerance=EVAL_ONSET_TOLERANCE,
             event_gap_seconds=EVAL_EVENT_GAP_SECONDS,
+            default_onset_th=EVAL_ONSET_THRESHOLD,
+            default_frame_th=EVAL_FRAME_THRESHOLD,
+            sweep_focus_classes=THRESHOLD_SWEEP_FOCUS_CLASSES,
         )
+
+        if val_bundle.get("threshold_sweep") is not None:
+            self.best_frame_th_per_class = list(
+                val_bundle["threshold_sweep"]["frame_th_per_class"]
+            )
+            self.best_onset_th_per_class = list(
+                val_bundle["threshold_sweep"]["onset_th_per_class"]
+            )
+
+        if FAILURE_INSPECTION:
+            chunk_ef1 = val_bundle["ipt_default_thresholds"].get("chunk_event_f1", [])
+            if chunk_ef1:
+                saved = record_failure_modes(
+                    pred_ipt_chunks,
+                    tar_ipt_chunks,
+                    pred_onset_chunks,
+                    tar_onset_chunks,
+                    chunk_ef1,
+                    save_dir=self.failure_dir,
+                    epoch=epoch,
+                    frame_th_per_class=self.best_frame_th_per_class,
+                    default_frame_th=EVAL_FRAME_THRESHOLD,
+                    frame_f1_min=FAILURE_FRAME_F1_MIN,
+                    event_f1_max=FAILURE_EVENT_F1_MAX,
+                    max_plots_per_class=FAILURE_MAX_PLOTS_PER_CLASS,
+                    focus_classes=FAILURE_FOCUS_CLASSES,
+                )
+                if saved:
+                    print(f"Failure inspection: saved {len(saved)} plot(s) under {self.failure_dir}")
 
         eva_result = (
             loss_IPT / b_size,
@@ -131,26 +176,27 @@ class Trainer:
             metrics_pitch["metric/pitch_frame/f1"][0],
             loss_onset / b_size,
         )
-        return eva_result, ipt_metrics
+        return eva_result, val_bundle
 
     def Tester(self, loader, b_size, we):
-        """Backward-compatible wrapper (returns legacy 9-tuple only)."""
-        eva_result, _ = self.evaluate_epoch(loader, b_size, we)
+        eva_result, _ = self.evaluate_epoch(loader, b_size, we, epoch=0)
         return eva_result
 
-    def _log_ipt_metrics(self, epoch: int, ipt_metrics: dict, eva_result=None):
-        print(format_ipt_metrics_report(ipt_metrics, epoch=epoch))
+    def _log_ipt_metrics(self, epoch: int, val_bundle: dict, eva_result=None):
+        print(format_full_evaluation_report(val_bundle, epoch=epoch))
         extra = None
         if eva_result is not None:
             extra = {
                 "legacy_ipt_frame_f1": float(eva_result[3]),
                 "legacy_pitch_frame_f1": float(eva_result[7]),
+                "checkpoint_score": float(
+                    _validation_score_for_checkpoint(eva_result, val_bundle)
+                ),
             }
-        append_metrics_jsonl(self.metrics_log_path, epoch, ipt_metrics, extra=extra)
+        append_metrics_jsonl(self.metrics_log_path, epoch, val_bundle, extra=extra)
 
     def fit(self, tr_loader, va_loader, we):
         st = time.time()
-
         lr = self.lr
 
         viz = Visdom()
@@ -165,6 +211,7 @@ class Trainer:
         viz.line([[0.0, 0.0]], [0], win="onset_loss_" + saveName, opts=dict(title="onset_loss_" + saveName, legend=['train_loss', 'valid_loss']))
         viz.line([[0.0]], [0], win="IPT_event_MA_" + saveName, opts=dict(title="IPT_event_MA_" + saveName, legend=['event_MA_F1']))
         viz.line([[0.0]], [0], win="IPT_frame_MA_" + saveName, opts=dict(title="IPT_frame_MA_" + saveName, legend=['frame_MA_F1']))
+        viz.line([[0.0]], [0], win="macro_note_f1_" + saveName, opts=dict(title="macro_note_f1_" + saveName, legend=['macro_note_f1']))
         best_acc = 0.0
         last_best_epoch = 1
 
@@ -198,16 +245,18 @@ class Trainer:
                 loss = sp_loss(IPT_pred, target, we)
                 loss_p = pitch_loss(pitch_pred, target_p)
                 loss_o = onset_loss(onset_pred, target_o)
-                loss_all = loss + 0.5 * loss_p + 0.5 * loss_o
+                loss_all = (
+                    loss
+                    + PITCH_LOSS_WEIGHT * loss_p
+                    + ONSET_LOSS_WEIGHT * loss_o
+                )
                 loss_total_i += loss.data
                 loss_total_p += loss_p.data
                 loss_total_o += loss_o.data
 
                 optimizer.zero_grad()
                 loss_all.backward()
-
                 clip_grad_norm_(self.model.parameters(), 3)
-
                 optimizer.step()
                 scheduler.step()
 
@@ -224,11 +273,14 @@ class Trainer:
             print(loss_total_o / len(tr_loader))
 
             print(self.save_fn)
-            eva_result, ipt_metrics = self.evaluate_epoch(
-                va_loader, len(va_loader.dataset), we
+            eva_result, val_bundle = self.evaluate_epoch(
+                va_loader, len(va_loader.dataset), we, epoch=e
             )
-            self._log_ipt_metrics(e, ipt_metrics, eva_result=eva_result)
+            self._log_ipt_metrics(e, val_bundle, eva_result=eva_result)
             self.model.train()
+
+            ipt = val_bundle["ipt_swept_thresholds"] if val_bundle.get("threshold_sweep") else val_bundle["ipt_default_thresholds"]
+            macro_note = val_bundle["prepost"]["macro_note_f1"]
 
             viz.line(
                 [[float(loss_total_i / len(tr_loader.dataset)), float(eva_result[0])]],
@@ -255,37 +307,38 @@ class Trainer:
                 update='append',
             )
             viz.line(
-                [[float(ipt_metrics["frame"]["macro_f1"])]],
+                [[float(ipt["frame"]["macro_f1"])]],
                 [e - 1],
                 win="IPT_frame_MA_" + saveName,
                 update='append',
             )
             viz.line(
-                [[float(ipt_metrics["event"]["macro_f1"])]],
+                [[float(ipt["event"]["macro_f1"])]],
                 [e - 1],
                 win="IPT_event_MA_" + saveName,
                 update='append',
             )
+            viz.line([[float(macro_note)]], [e - 1], win="macro_note_f1_" + saveName, update='append')
 
             print("IPT_F1 (legacy multipitch):", eva_result[3])
             print("pitch_F1:", eva_result[7])
             print(
-                "IPT frame MA-F1: %.4f  event MA-F1: %.4f"
-                % (ipt_metrics["frame"]["macro_f1"], ipt_metrics["event"]["macro_f1"])
+                "note F1 (after post-proc): %.4f  macro_note_f1: %.4f"
+                % (
+                    val_bundle["prepost"]["after"]["note_f1"],
+                    macro_note,
+                )
             )
-            score = _validation_score_for_checkpoint(eva_result)
+            score = _validation_score_for_checkpoint(eva_result, val_bundle)
             print("best_ckpt_metric (%s): %f" % (BEST_CHECKPOINT_METRIC, score))
 
-            if e % self.validation_interval == 1:
-                if score > best_acc:
-                    best_acc = score
-                    last_best_epoch = e
-
-                    rm_lst = glob(self.save_fn + 'best_*')
-                    for p in rm_lst:
-                        os.remove(p)
-                    torch.save(self.model.state_dict(), self.save_fn + 'best' + '_e_%d' % (e - 1))
-                else:
-                    if ENABLE_EARLY_STOPPING and (e - last_best_epoch >= EARLY_STOPPING):
-                        print('Early stopping at epoch {}...'.format(e + 1))
-                        break
+            if score > best_acc:
+                best_acc = score
+                last_best_epoch = e
+                rm_lst = glob(self.save_fn + 'best_*')
+                for p in rm_lst:
+                    os.remove(p)
+                torch.save(self.model.state_dict(), self.save_fn + 'best' + '_e_%d' % (e - 1))
+            elif ENABLE_EARLY_STOPPING and (e - last_best_epoch >= EARLY_STOPPING):
+                print('Early stopping at epoch {}...'.format(e))
+                break

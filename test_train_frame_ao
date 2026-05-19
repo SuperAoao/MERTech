@@ -25,6 +25,7 @@ from function.config import (  # noqa: E402
     MIN_MIDI,
     MERT_SAMPLE_RATE,
     NUM_LABELS,
+    THRESHOLD_SWEEP_FOCUS_CLASSES,
     URL,
     device,
     saveName,
@@ -32,9 +33,9 @@ from function.config import (  # noqa: E402
 )
 from function.load_data import load  # noqa: E402
 from function.metrics_ipt import (  # noqa: E402
-    evaluate_ipt_chunks,
+    bundle_to_json_serializable,
     format_ipt_test_report,
-    metrics_to_json_serializable,
+    run_full_validation_metrics,
 )
 from function.model import SSLNet  # noqa: E402
 
@@ -118,19 +119,21 @@ def start_test():
             pred_onset_chunks.append(o_pred[:, :t_len].copy())
             tar_onset_chunks.append(np.asarray(target_o[:, :t_len], dtype=np.float32))
 
-    ipt_metrics = evaluate_ipt_chunks(
+    val_bundle = run_full_validation_metrics(
         pred_ipt_chunks,
         tar_ipt_chunks,
         pred_onset_chunks,
         tar_onset_chunks,
-        onset_th=EVAL_ONSET_THRESHOLD,
-        frame_th=EVAL_FRAME_THRESHOLD,
+        do_threshold_sweep=True,
         onset_tolerance=EVAL_ONSET_TOLERANCE,
         event_gap_seconds=EVAL_EVENT_GAP_SECONDS,
+        default_onset_th=EVAL_ONSET_THRESHOLD,
+        default_frame_th=EVAL_FRAME_THRESHOLD,
+        sweep_focus_classes=THRESHOLD_SWEEP_FOCUS_CLASSES,
     )
 
     report = format_ipt_test_report(
-        ipt_metrics,
+        val_bundle,
         model_name=model_name,
         checkpoint_path=CHECKPOINT_PATH,
         test_time=test_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -159,7 +162,7 @@ def start_test():
                 "test_time": test_time.isoformat(),
                 "dataset": DATASET,
                 "test_group": TEST_GROUP,
-                "metrics": metrics_to_json_serializable(ipt_metrics),
+                "metrics": bundle_to_json_serializable(val_bundle),
             },
             f,
             indent=2,

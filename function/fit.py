@@ -7,7 +7,6 @@ from config import *
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.nn.utils import clip_grad_norm_
 import math
-from visdom import Visdom
 from glob import glob
 import os
 from metrics_ipt import (
@@ -16,6 +15,28 @@ from metrics_ipt import (
     append_metrics_jsonl,
 )
 from failure_inspection import record_failure_modes
+
+
+class _NoOpVisdom:
+    """Skip plotting when Visdom server is off or USE_VISDOM=False."""
+
+    def line(self, *args, **kwargs):
+        pass
+
+
+def _make_visdom():
+    if not USE_VISDOM:
+        return _NoOpVisdom()
+    try:
+        from visdom import Visdom
+
+        viz = Visdom()
+        if getattr(viz, "check_connection", lambda: True)():
+            return viz
+        print("Visdom: no server at localhost:8097 — training without live plots.")
+    except Exception as exc:
+        print("Visdom disabled (%s) — training without live plots." % exc)
+    return _NoOpVisdom()
 
 
 def _validation_score_for_checkpoint(eva_result, val_bundle):
@@ -199,7 +220,7 @@ class Trainer:
         st = time.time()
         lr = self.lr
 
-        viz = Visdom()
+        viz = _make_visdom()
         viz.line([[0.0, 0.0]], [0], win="IPT_loss_" + saveName, opts=dict(title="IPT_loss_" + saveName, legend=['train_loss', 'valid_loss']))
         viz.line([[0.0]], [0], win="IPT_precision_" + saveName, opts=dict(title="IPT_precision_" + saveName, legend=['valid_IPT_precision']))
         viz.line([[0.0]], [0], win="IPT_recall_" + saveName, opts=dict(title="IPT_recall_" + saveName, legend=['valid_IPT_recall']))
@@ -272,73 +293,83 @@ class Trainer:
             print(loss_total_p / len(tr_loader))
             print(loss_total_o / len(tr_loader))
 
-            print(self.save_fn)
-            eva_result, val_bundle = self.evaluate_epoch(
-                va_loader, len(va_loader.dataset), we, epoch=e
-            )
-            self._log_ipt_metrics(e, val_bundle, eva_result=eva_result)
-            self.model.train()
-
-            ipt = val_bundle["ipt_swept_thresholds"] if val_bundle.get("threshold_sweep") else val_bundle["ipt_default_thresholds"]
-            macro_note = val_bundle["prepost"]["macro_note_f1"]
-
-            viz.line(
-                [[float(loss_total_i / len(tr_loader.dataset)), float(eva_result[0])]],
-                [e - 1],
-                win="IPT_loss_" + saveName,
-                update='append',
-            )
-            viz.line([[float(eva_result[1])]], [e - 1], win="IPT_precision_" + saveName, update='append')
-            viz.line([[float(eva_result[2])]], [e - 1], win="IPT_recall_" + saveName, update='append')
-            viz.line([[float(eva_result[3])]], [e - 1], win="IPT_F1_" + saveName, update='append')
-            viz.line(
-                [[float(loss_total_p / len(tr_loader.dataset)), float(eva_result[4])]],
-                [e - 1],
-                win="pitch_loss_" + saveName,
-                update='append',
-            )
-            viz.line([[float(eva_result[5])]], [e - 1], win="pitch_precision_" + saveName, update='append')
-            viz.line([[float(eva_result[6])]], [e - 1], win="pitch_recall_" + saveName, update='append')
-            viz.line([[float(eva_result[7])]], [e - 1], win="pitch_F1_" + saveName, update='append')
-            viz.line(
-                [[float(loss_total_o / len(tr_loader.dataset)), float(eva_result[8])]],
-                [e - 1],
-                win="onset_loss_" + saveName,
-                update='append',
-            )
-            viz.line(
-                [[float(ipt["frame"]["macro_f1"])]],
-                [e - 1],
-                win="IPT_frame_MA_" + saveName,
-                update='append',
-            )
-            viz.line(
-                [[float(ipt["event"]["macro_f1"])]],
-                [e - 1],
-                win="IPT_event_MA_" + saveName,
-                update='append',
-            )
-            viz.line([[float(macro_note)]], [e - 1], win="macro_note_f1_" + saveName, update='append')
-
-            print("IPT_F1 (legacy multipitch):", eva_result[3])
-            print("pitch_F1:", eva_result[7])
-            print(
-                "note F1 (after post-proc): %.4f  macro_note_f1: %.4f"
-                % (
-                    val_bundle["prepost"]["after"]["note_f1"],
-                    macro_note,
+            # Full validation (metrics, sweep, failure plots) every validation_interval epochs
+            if e % self.validation_interval == 1:
+                print(self.save_fn)
+                print(
+                    "Running validation (interval=%d, epoch %d)..."
+                    % (self.validation_interval, e)
                 )
-            )
-            score = _validation_score_for_checkpoint(eva_result, val_bundle)
-            print("best_ckpt_metric (%s): %f" % (BEST_CHECKPOINT_METRIC, score))
+                eva_result, val_bundle = self.evaluate_epoch(
+                    va_loader, len(va_loader.dataset), we, epoch=e
+                )
+                self._log_ipt_metrics(e, val_bundle, eva_result=eva_result)
+                self.model.train()
 
-            if score > best_acc:
-                best_acc = score
-                last_best_epoch = e
-                rm_lst = glob(self.save_fn + 'best_*')
-                for p in rm_lst:
-                    os.remove(p)
-                torch.save(self.model.state_dict(), self.save_fn + 'best' + '_e_%d' % (e - 1))
-            elif ENABLE_EARLY_STOPPING and (e - last_best_epoch >= EARLY_STOPPING):
-                print('Early stopping at epoch {}...'.format(e))
-                break
+                ipt = (
+                    val_bundle["ipt_swept_thresholds"]
+                    if val_bundle.get("threshold_sweep")
+                    else val_bundle["ipt_default_thresholds"]
+                )
+                macro_note = val_bundle["prepost"]["macro_note_f1"]
+
+                viz.line(
+                    [[float(loss_total_i / len(tr_loader.dataset)), float(eva_result[0])]],
+                    [e - 1],
+                    win="IPT_loss_" + saveName,
+                    update='append',
+                )
+                viz.line([[float(eva_result[1])]], [e - 1], win="IPT_precision_" + saveName, update='append')
+                viz.line([[float(eva_result[2])]], [e - 1], win="IPT_recall_" + saveName, update='append')
+                viz.line([[float(eva_result[3])]], [e - 1], win="IPT_F1_" + saveName, update='append')
+                viz.line(
+                    [[float(loss_total_p / len(tr_loader.dataset)), float(eva_result[4])]],
+                    [e - 1],
+                    win="pitch_loss_" + saveName,
+                    update='append',
+                )
+                viz.line([[float(eva_result[5])]], [e - 1], win="pitch_precision_" + saveName, update='append')
+                viz.line([[float(eva_result[6])]], [e - 1], win="pitch_recall_" + saveName, update='append')
+                viz.line([[float(eva_result[7])]], [e - 1], win="pitch_F1_" + saveName, update='append')
+                viz.line(
+                    [[float(loss_total_o / len(tr_loader.dataset)), float(eva_result[8])]],
+                    [e - 1],
+                    win="onset_loss_" + saveName,
+                    update='append',
+                )
+                viz.line(
+                    [[float(ipt["frame"]["macro_f1"])]],
+                    [e - 1],
+                    win="IPT_frame_MA_" + saveName,
+                    update='append',
+                )
+                viz.line(
+                    [[float(ipt["event"]["macro_f1"])]],
+                    [e - 1],
+                    win="IPT_event_MA_" + saveName,
+                    update='append',
+                )
+                viz.line([[float(macro_note)]], [e - 1], win="macro_note_f1_" + saveName, update='append')
+
+                print("IPT_F1 (legacy multipitch):", eva_result[3])
+                print("pitch_F1:", eva_result[7])
+                print(
+                    "note F1 (after post-proc): %.4f  macro_note_f1: %.4f"
+                    % (
+                        val_bundle["prepost"]["after"]["note_f1"],
+                        macro_note,
+                    )
+                )
+                score = _validation_score_for_checkpoint(eva_result, val_bundle)
+                print("best_ckpt_metric (%s): %f" % (BEST_CHECKPOINT_METRIC, score))
+
+                if score > best_acc:
+                    best_acc = score
+                    last_best_epoch = e
+                    rm_lst = glob(self.save_fn + 'best_*')
+                    for p in rm_lst:
+                        os.remove(p)
+                    torch.save(self.model.state_dict(), self.save_fn + 'best' + '_e_%d' % (e - 1))
+                elif ENABLE_EARLY_STOPPING and (e - last_best_epoch >= EARLY_STOPPING):
+                    print('Early stopping at epoch {}...'.format(e))
+                    break

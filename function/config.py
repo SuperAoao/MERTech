@@ -65,3 +65,6 @@ FAILURE_FRAME_F1_MIN = 0.8
 FAILURE_EVENT_F1_MAX = 0.4
 FAILURE_MAX_PLOTS_PER_CLASS = 3
 FAILURE_FOCUS_CLASSES = [5, 6]
+
+# Live training curves via Visdom (requires: python -m visdom.server on port 8097)
+USE_VISDOM = False

@@ -90,7 +90,8 @@ class TemporalPyramidTransformer(nn.Module):
             fused = feats[lvl] + up
 
         # Residual: keep original x accessible; gate controls how much FPT changes x.
-        x_fused = self.norm_out(x + torch.tanh(self.res_gate) * fused)
+        fused = self.norm_out(fused) # When FPT is used, the fused feature is normalized before the residual connection.
+        x_fused = x + torch.tanh(self.res_gate) * fused # When res_gate is 0, the fused feature is not used.
         return x_fused
 
 

@@ -28,7 +28,7 @@ FPT_NUM_HEADS = 8
 FPT_DROPOUT = 0.1
 
 # Baseline (USE_FPT=False): early stopping on IPT frame F1.
-# FPT (USE_FPT=True): early stopping on combined score (includes note / macro_note).
+# FPT (USE_FPT=True): early stopping on combined score (IPT + pitch + PN frame/event F1).
 if USE_FPT:
     ENABLE_EARLY_STOPPING = True
     BEST_CHECKPOINT_METRIC = "combined"

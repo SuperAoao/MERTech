@@ -10,6 +10,7 @@ import math
 from glob import glob
 import os
 from metrics_ipt import (
+    IPT_NAMES,
     run_full_validation_metrics,
     format_full_evaluation_report,
     append_metrics_jsonl,
@@ -42,19 +43,26 @@ def _make_visdom():
 def _validation_score_for_checkpoint(eva_result, val_bundle):
     """
     Combined checkpoint score (when BEST_CHECKPOINT_METRIC == 'combined'):
-      mean of legacy IPT frame F1, pitch frame F1, joint note F1 (after post-proc),
-      and macro_note_f1 (mean per-class note F1 after post-proc).
+      mean of legacy IPT frame F1, pitch frame F1, PN frame F1, and PN event F1.
+      PN metrics use per-class swept thresholds when threshold sweep is enabled.
     """
     m = BEST_CHECKPOINT_METRIC.lower()
     if m == "pitch":
         return float(eva_result[7])
     if m == "combined":
-        prepost = val_bundle["prepost"]
+        ipt = (
+            val_bundle["ipt_swept_thresholds"]
+            if val_bundle.get("threshold_sweep")
+            else val_bundle["ipt_default_thresholds"]
+        )
+        pn_idx = IPT_NAMES.index("PN")
+        pn_frame_f1 = float(ipt["frame"]["per_class_f1"][pn_idx])
+        pn_event_f1 = float(ipt["event"]["per_class_f1"][pn_idx])
         return (
             float(eva_result[3])
             + float(eva_result[7])
-            + float(prepost["after"]["note_f1"])
-            + float(prepost["macro_note_f1"])
+            + pn_frame_f1
+            + pn_event_f1
         ) / 4.0
     if m != "ipt":
         print(

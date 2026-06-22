@@ -1,6 +1,11 @@
 #config
 import torch
 
+# --- Experiment metadata (set by scripts/train.py via experiment_config) ---
+EXPERIMENT_ID = "default"
+RUN_DIR = None
+SEED = 42
+
 URL = "m-a-p/MERT-v1-95M" #model URL
 TIME_LENGTH = 5 #5 seconds
 LENGTH = 375 #number of frame in 3 seconds,225
@@ -27,14 +32,9 @@ FPT_NUM_LAYERS = 1
 FPT_NUM_HEADS = 8
 FPT_DROPOUT = 0.1
 
-# Baseline (USE_FPT=False): early stopping on IPT frame F1.
-# FPT (USE_FPT=True): early stopping on combined score (IPT + pitch + PN frame/event F1).
-if USE_FPT:
-    ENABLE_EARLY_STOPPING = True
-    BEST_CHECKPOINT_METRIC = "combined"
-else:
-    ENABLE_EARLY_STOPPING = True
-    BEST_CHECKPOINT_METRIC = "ipt"
+# Checkpoint / early stopping (overridden per experiment in configs/*.yaml)
+ENABLE_EARLY_STOPPING = True
+BEST_CHECKPOINT_METRIC = "combined"
 
 # Training loss: loss + PITCH_LOSS_WEIGHT * loss_p + ONSET_LOSS_WEIGHT * loss_o
 PITCH_LOSS_WEIGHT = 0.5

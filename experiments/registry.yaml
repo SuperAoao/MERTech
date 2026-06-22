@@ -1,0 +1,30 @@
+# Experiment registry — index of runs (artifacts live under run_dir; not in git).
+# Update status/notes after each train + test cycle.
+experiments:
+  - id: baseline
+    status: done
+    config: configs/baseline.yaml
+    run_dir: data/model/baseline
+    checkpoint: data/model/baseline/best_e_2225
+    notes: "Pre-refactor baseline (no FPT, ckpt=ipt). Test PN event F1 ~51%."
+
+  - id: fpt_combined_v1
+    status: done
+    config: null
+    run_dir: data/model/202652516:4:1/mul_onset7_pitch_IPT_share_weight_weighted_loss-MERT-v1-95M
+    checkpoint: data/model/202652516:4:1/mul_onset7_pitch_IPT_share_weight_weighted_loss-MERT-v1-95M/best_e_2555
+    notes: "Legacy FPT run; old combined ckpt (note + macro_note). Test PN event F1 ~45%."
+
+  - id: fpt_combined_pn
+    status: planned
+    config: configs/fpt_combined_pn.yaml
+    run_dir: null
+    checkpoint: null
+    notes: "FPT with combined ckpt (IPT + pitch + PN frame/event)."
+
+  - id: fpt_pn_frame
+    status: planned
+    config: configs/fpt_pn_frame.yaml
+    run_dir: null
+    checkpoint: null
+    notes: "FPT with pn_frame ckpt (IPT + pitch + 2*PN frame) / 4."

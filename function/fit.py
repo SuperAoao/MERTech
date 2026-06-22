@@ -40,36 +40,99 @@ def _make_visdom():
     return _NoOpVisdom()
 
 
-def _validation_score_for_checkpoint(eva_result, val_bundle):
+def _ipt_threshold_metrics(val_bundle):
+    """Per-class IPT metrics with swept thresholds when available."""
+    if val_bundle.get("threshold_sweep"):
+        return val_bundle["ipt_swept_thresholds"]
+    return val_bundle["ipt_default_thresholds"]
+
+
+def _pn_frame_f1(val_bundle) -> float:
+    ipt = _ipt_threshold_metrics(val_bundle)
+    pn_idx = IPT_NAMES.index("PN")
+    return float(ipt["frame"]["per_class_f1"][pn_idx])
+
+
+def _checkpoint_score_breakdown(eva_result, val_bundle):
     """
-    Combined checkpoint score (when BEST_CHECKPOINT_METRIC == 'combined'):
-      mean of legacy IPT frame F1, pitch frame F1, PN frame F1, and PN event F1.
-      PN metrics use per-class swept thresholds when threshold sweep is enabled.
+    Return (score, details) for checkpoint selection and jsonl logging.
+
+    Supported BEST_CHECKPOINT_METRIC values:
+      ipt       — legacy IPT micro frame F1
+      pitch     — pitch frame F1
+      combined  — (IPT + pitch + PN frame + PN event) / 4
+      pn_frame  — (IPT + pitch + 2 * PN frame) / 4  (PN-weighted composite)
     """
     m = BEST_CHECKPOINT_METRIC.lower()
+    ipt_frame = float(eva_result[3])
+    pitch_frame = float(eva_result[7])
+    pn_frame = _pn_frame_f1(val_bundle)
+
+    details = {
+        "checkpoint_metric": m,
+        "ipt_frame_f1": ipt_frame,
+        "pitch_frame_f1": pitch_frame,
+        "pn_frame_f1": pn_frame,
+    }
+
     if m == "pitch":
-        return float(eva_result[7])
-    if m == "combined":
-        ipt = (
-            val_bundle["ipt_swept_thresholds"]
-            if val_bundle.get("threshold_sweep")
-            else val_bundle["ipt_default_thresholds"]
-        )
+        score = pitch_frame
+    elif m == "combined":
+        ipt = _ipt_threshold_metrics(val_bundle)
         pn_idx = IPT_NAMES.index("PN")
-        pn_frame_f1 = float(ipt["frame"]["per_class_f1"][pn_idx])
-        pn_event_f1 = float(ipt["event"]["per_class_f1"][pn_idx])
-        return (
-            float(eva_result[3])
-            + float(eva_result[7])
-            + pn_frame_f1
-            + pn_event_f1
-        ) / 4.0
-    if m != "ipt":
+        pn_event = float(ipt["event"]["per_class_f1"][pn_idx])
+        details["pn_event_f1"] = pn_event
+        score = (ipt_frame + pitch_frame + pn_frame + pn_event) / 4.0
+    elif m == "pn_frame":
+        details["pn_frame_weight"] = 2
+        score = (ipt_frame + pitch_frame + 2.0 * pn_frame) / 4.0
+    elif m == "ipt":
+        score = ipt_frame
+    else:
         print(
             "Warning: unknown BEST_CHECKPOINT_METRIC=%r; using ipt"
             % (BEST_CHECKPOINT_METRIC,)
         )
-    return float(eva_result[3])
+        details["checkpoint_metric"] = "ipt"
+        score = ipt_frame
+
+    details["checkpoint_score"] = float(score)
+    return float(score), details
+
+
+def _validation_score_for_checkpoint(eva_result, val_bundle):
+    score, _ = _checkpoint_score_breakdown(eva_result, val_bundle)
+    return score
+
+
+def _format_checkpoint_log_line(details: dict) -> str:
+    metric = details.get("checkpoint_metric", "?")
+    score = details.get("checkpoint_score", 0.0)
+    if metric == "pn_frame":
+        return (
+            "best_ckpt_metric (pn_frame): %.4f  "
+            "[IPT frame=%.4f  pitch=%.4f  PN frame=%.4f  (PN weight=%d)]"
+            % (
+                score,
+                details["ipt_frame_f1"],
+                details["pitch_frame_f1"],
+                details["pn_frame_f1"],
+                details.get("pn_frame_weight", 2),
+            )
+        )
+    if metric == "combined":
+        return (
+            "best_ckpt_metric (combined): %.4f  "
+            "[IPT frame=%.4f  pitch=%.4f  PN frame=%.4f  PN event=%.4f]"
+            % (
+                score,
+                details["ipt_frame_f1"],
+                details["pitch_frame_f1"],
+                details["pn_frame_f1"],
+                details.get("pn_event_f1", 0.0),
+            )
+        )
+    return "best_ckpt_metric (%s): %.4f" % (metric, score)
 
 
 class Trainer:
@@ -215,12 +278,11 @@ class Trainer:
         print(format_full_evaluation_report(val_bundle, epoch=epoch))
         extra = None
         if eva_result is not None:
+            _, ckpt_details = _checkpoint_score_breakdown(eva_result, val_bundle)
             extra = {
                 "legacy_ipt_frame_f1": float(eva_result[3]),
                 "legacy_pitch_frame_f1": float(eva_result[7]),
-                "checkpoint_score": float(
-                    _validation_score_for_checkpoint(eva_result, val_bundle)
-                ),
+                **ckpt_details,
             }
         append_metrics_jsonl(self.metrics_log_path, epoch, val_bundle, extra=extra)
 
@@ -368,8 +430,8 @@ class Trainer:
                         macro_note,
                     )
                 )
-                score = _validation_score_for_checkpoint(eva_result, val_bundle)
-                print("best_ckpt_metric (%s): %f" % (BEST_CHECKPOINT_METRIC, score))
+                score, ckpt_details = _checkpoint_score_breakdown(eva_result, val_bundle)
+                print(_format_checkpoint_log_line(ckpt_details))
 
                 if score > best_acc:
                     best_acc = score

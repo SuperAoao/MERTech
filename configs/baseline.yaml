@@ -1,0 +1,36 @@
+# Baseline MERTech (no FPT), checkpoint on IPT frame F1.
+experiment_id: baseline
+seed: 42
+dataset: Guzheng_Tech99
+
+model:
+  url: m-a-p/MERT-v1-95M
+  freeze_all: false
+  use_fpt: false
+
+training:
+  lr: 1.0e-3
+  max_epochs: 10000
+  batch_size: 10
+  validation_interval: 5
+  save_interval: 100
+  early_stopping: 1000
+  enable_early_stopping: true
+  best_checkpoint_metric: ipt
+
+loss:
+  pitch_weight: 0.5
+  onset_weight: 1.0
+
+eval:
+  onset_threshold: 0.5
+  frame_threshold: 0.5
+  onset_tolerance: 0.05
+  event_gap_seconds: 1.0
+  threshold_sweep_every_epoch: true
+  failure_inspection: true
+  failure_focus_classes: [5, 6]
+
+runtime:
+  cuda_device: "0"
+  use_visdom: false

@@ -61,6 +61,17 @@ def onset_loss(on_pred, on_tar):
         loss_o += loss_fn(out, fl_target)
     return loss_o
 
+
+def pn_head_loss(pn_logits, target_ipt, pn_idx=PN_IDX, pos_weight=PN_HEAD_POS_WEIGHT):
+    """
+    Auxiliary BCE on dedicated PN head logits.
+    pn_logits: [B, T]; target_ipt: [B, C, T] with PN channel at pn_idx.
+    """
+    target_pn = target_ipt[:, pn_idx, :]
+    weight = pos_weight * target_pn.data + (1.0 - target_pn.data)
+    loss_fn = nn.BCEWithLogitsLoss(weight=weight, reduction="mean")
+    return loss_fn(pn_logits, target_pn)
+
 def num_params(model):
     params = 0
     for i in model.parameters():

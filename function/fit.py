@@ -4,6 +4,7 @@ import torch.optim as optim
 import time
 from lib import *
 from config import *
+import config as config_runtime
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.nn.utils import clip_grad_norm_
 import math
@@ -48,9 +49,17 @@ def _ipt_threshold_metrics(val_bundle):
 
 
 def _pn_frame_f1(val_bundle) -> float:
-    ipt = _ipt_threshold_metrics(val_bundle)
+    """PN frame F1 from default thresholds only (aligned with default test report)."""
+    ipt = val_bundle["ipt_default_thresholds"]
     pn_idx = IPT_NAMES.index("PN")
     return float(ipt["frame"]["per_class_f1"][pn_idx])
+
+
+def _pn_event_f1(val_bundle) -> float:
+    """PN event F1 from default thresholds only (aligned with default test report)."""
+    ipt = val_bundle["ipt_default_thresholds"]
+    pn_idx = IPT_NAMES.index("PN")
+    return float(ipt["event"]["per_class_f1"][pn_idx])
 
 
 def _checkpoint_score_breakdown(eva_result, val_bundle):
@@ -61,7 +70,9 @@ def _checkpoint_score_breakdown(eva_result, val_bundle):
       ipt       — legacy IPT micro frame F1
       pitch     — pitch frame F1
       combined  — (IPT + pitch + PN frame + PN event) / 4
+                  where PN metrics use default thresholds, not swept thresholds
       pn_frame  — (IPT + pitch + 2 * PN frame) / 4  (PN-weighted composite)
+                  where PN frame uses default thresholds, not swept thresholds
     """
     m = BEST_CHECKPOINT_METRIC.lower()
     ipt_frame = float(eva_result[3])
@@ -78,9 +89,7 @@ def _checkpoint_score_breakdown(eva_result, val_bundle):
     if m == "pitch":
         score = pitch_frame
     elif m == "combined":
-        ipt = _ipt_threshold_metrics(val_bundle)
-        pn_idx = IPT_NAMES.index("PN")
-        pn_event = float(ipt["event"]["per_class_f1"][pn_idx])
+        pn_event = _pn_event_f1(val_bundle)
         details["pn_event_f1"] = pn_event
         score = (ipt_frame + pitch_frame + pn_frame + pn_event) / 4.0
     elif m == "pn_frame":
@@ -322,6 +331,7 @@ class Trainer:
             loss_total_p = 0
             loss_total_i = 0
             loss_total_o = 0
+            loss_total_pn = 0
             print('\n==> Training Epoch #%d lr=%4f' % (e, lr))
 
             for batch_idx, _input in enumerate(tr_loader):
@@ -341,6 +351,10 @@ class Trainer:
                     + PITCH_LOSS_WEIGHT * loss_p
                     + ONSET_LOSS_WEIGHT * loss_o
                 )
+                if config_runtime.USE_PN_HEAD and self.model._pn_aux_logit is not None:
+                    loss_pn = pn_head_loss(self.model._pn_aux_logit, target)
+                    loss_all = loss_all + config_runtime.PN_HEAD_LOSS_WEIGHT * loss_pn
+                    loss_total_pn += loss_pn.data
                 loss_total_i += loss.data
                 loss_total_p += loss_p.data
                 loss_total_o += loss_o.data
@@ -362,6 +376,8 @@ class Trainer:
             print(loss_total_i / len(tr_loader))
             print(loss_total_p / len(tr_loader))
             print(loss_total_o / len(tr_loader))
+            if config_runtime.USE_PN_HEAD:
+                print(loss_total_pn / len(tr_loader))
 
             # Full validation (metrics, sweep, failure plots) every validation_interval epochs
             if e % self.validation_interval == 1:

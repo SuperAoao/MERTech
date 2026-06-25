@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+import torch
+
 import config as config_mod
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +49,13 @@ def default_experiment_dict() -> Dict[str, Any]:
             "fpt_num_layers": config_mod.FPT_NUM_LAYERS,
             "fpt_num_heads": config_mod.FPT_NUM_HEADS,
             "fpt_dropout": config_mod.FPT_DROPOUT,
+            "use_pn_head": config_mod.USE_PN_HEAD,
+            "pn_head_context": config_mod.PN_HEAD_CONTEXT,
+            "pn_head_hidden": config_mod.PN_HEAD_HIDDEN,
+            "pn_head_dropout": config_mod.PN_HEAD_DROPOUT,
+            "pn_head_use_pluck_gate": config_mod.PN_HEAD_USE_PLUCK_GATE,
+            "pn_head_use_onset_gate": config_mod.PN_HEAD_USE_ONSET_GATE,
+            "pn_fusion_alpha": config_mod.PN_FUSION_ALPHA,
         },
         "training": {
             "lr": 1e-3,
@@ -61,6 +70,8 @@ def default_experiment_dict() -> Dict[str, Any]:
         "loss": {
             "pitch_weight": config_mod.PITCH_LOSS_WEIGHT,
             "onset_weight": config_mod.ONSET_LOSS_WEIGHT,
+            "pn_head_weight": config_mod.PN_HEAD_LOSS_WEIGHT,
+            "pn_head_pos_weight": config_mod.PN_HEAD_POS_WEIGHT,
         },
         "eval": {
             "onset_threshold": config_mod.EVAL_ONSET_THRESHOLD,
@@ -130,6 +141,18 @@ def apply_experiment_config(cfg: Dict[str, Any], *, run_dir: Optional[str] = Non
     config_mod.FPT_NUM_HEADS = int(model.get("fpt_num_heads", config_mod.FPT_NUM_HEADS))
     config_mod.FPT_DROPOUT = float(model.get("fpt_dropout", config_mod.FPT_DROPOUT))
 
+    config_mod.USE_PN_HEAD = bool(model.get("use_pn_head", config_mod.USE_PN_HEAD))
+    config_mod.PN_HEAD_CONTEXT = int(model.get("pn_head_context", config_mod.PN_HEAD_CONTEXT))
+    config_mod.PN_HEAD_HIDDEN = int(model.get("pn_head_hidden", config_mod.PN_HEAD_HIDDEN))
+    config_mod.PN_HEAD_DROPOUT = float(model.get("pn_head_dropout", config_mod.PN_HEAD_DROPOUT))
+    config_mod.PN_HEAD_USE_PLUCK_GATE = bool(
+        model.get("pn_head_use_pluck_gate", config_mod.PN_HEAD_USE_PLUCK_GATE)
+    )
+    config_mod.PN_HEAD_USE_ONSET_GATE = bool(
+        model.get("pn_head_use_onset_gate", config_mod.PN_HEAD_USE_ONSET_GATE)
+    )
+    config_mod.PN_FUSION_ALPHA = float(model.get("pn_fusion_alpha", config_mod.PN_FUSION_ALPHA))
+
     config_mod.BATCH_SIZE = int(training.get("batch_size", config_mod.BATCH_SIZE))
     config_mod.EARLY_STOPPING = int(training.get("early_stopping", config_mod.EARLY_STOPPING))
     config_mod.ENABLE_EARLY_STOPPING = bool(
@@ -141,6 +164,12 @@ def apply_experiment_config(cfg: Dict[str, Any], *, run_dir: Optional[str] = Non
 
     config_mod.PITCH_LOSS_WEIGHT = float(loss.get("pitch_weight", config_mod.PITCH_LOSS_WEIGHT))
     config_mod.ONSET_LOSS_WEIGHT = float(loss.get("onset_weight", config_mod.ONSET_LOSS_WEIGHT))
+    config_mod.PN_HEAD_LOSS_WEIGHT = float(
+        loss.get("pn_head_weight", config_mod.PN_HEAD_LOSS_WEIGHT)
+    )
+    config_mod.PN_HEAD_POS_WEIGHT = float(
+        loss.get("pn_head_pos_weight", config_mod.PN_HEAD_POS_WEIGHT)
+    )
 
     config_mod.EVAL_ONSET_THRESHOLD = float(
         eval_cfg.get("onset_threshold", config_mod.EVAL_ONSET_THRESHOLD)
@@ -259,3 +288,26 @@ def resolve_config_for_run(run_dir: str | Path) -> Dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"No config.yaml in run directory: {run_dir}")
     return load_experiment_config(config_path)
+
+
+def load_sslnet_state_dict(model, checkpoint_path: str | Path) -> None:
+    """
+    Load weights into SSLNet. Allows partial load when checkpoint lacks pn_head.*
+    (e.g. finetune from FPT-only run with use_pn_head=true in config).
+    """
+    checkpoint_path = Path(checkpoint_path)
+    state = torch.load(checkpoint_path, map_location="cpu")
+    model_state = model.state_dict()
+    missing = [k for k in model_state if k not in state]
+    unexpected = [k for k in state if k not in model_state]
+    if missing and all(k.startswith("pn_head.") for k in missing):
+        model.load_state_dict(state, strict=False)
+        print(
+            "Loaded checkpoint with randomly initialized PN head "
+            "(%d missing keys: %s...)"
+            % (len(missing), ", ".join(missing[:3]))
+        )
+        if unexpected:
+            print("Unexpected keys ignored: %s" % unexpected[:5])
+        return
+    model.load_state_dict(state, strict=True)

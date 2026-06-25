@@ -43,6 +43,9 @@ python scripts/train.py --config configs/baseline.yaml
 # FPT + combined checkpoint（IPT + pitch + PN frame + PN event）/ 4
 python scripts/train.py --config configs/fpt_combined_pn.yaml
 
+# FPT + PN discriminator head + pn_frame checkpoint
+python scripts/train.py --config configs/fpt_pn_head.yaml
+
 # 指定输出目录（不自动建 runs/guzheng/...）
 python scripts/train.py --config configs/baseline.yaml --run-dir runs/guzheng/my_manual_run
 ```
@@ -121,6 +124,34 @@ training:
   best_checkpoint_metric: combined
 ```
 
+### 示例：`configs/fpt_pn_head.yaml`
+
+FPT + 专用 PN 判别头（局部时序卷积 + pluck 条件门控），checkpoint 按 `pn_frame` 选模：
+
+```yaml
+experiment_id: fpt_pn_head
+
+model:
+  use_fpt: true
+  use_pn_head: true
+  pn_head_context: 5
+  pn_fusion_alpha: 0.7   # 最终 PN = alpha*PN_head + (1-alpha)*IPT[6]
+
+training:
+  best_checkpoint_metric: pn_frame
+
+loss:
+  pn_head_weight: 2.0
+  pn_head_pos_weight: 5.0
+```
+
+可从无 PN head 的 FPT checkpoint 部分加载（`pn_head.*` 随机初始化）：
+
+```bash
+python scripts/test.py --config configs/fpt_pn_head.yaml \
+  --checkpoint data/model/.../best_e_2555
+```
+
 ### `best_checkpoint_metric` 选项
 
 | 值 | 公式 | 说明 |
@@ -167,10 +198,14 @@ best_ckpt_metric (pn_frame): 0.7200  [IPT frame=0.8900  pitch=0.9100  PN frame=0
 | `model.url` | `URL`, `MERT_SAMPLE_RATE` |
 | `model.use_fpt` | `USE_FPT` |
 | `model.fpt_*` | `FPT_LEVELS`, `FPT_NUM_LAYERS`, … |
+| `model.use_pn_head` | `USE_PN_HEAD` |
+| `model.pn_head_*`, `model.pn_fusion_alpha` | `PN_HEAD_*`, `PN_FUSION_ALPHA` |
 | `training.best_checkpoint_metric` | `BEST_CHECKPOINT_METRIC` |
 | `training.early_stopping` | `EARLY_STOPPING` |
 | `loss.pitch_weight` | `PITCH_LOSS_WEIGHT` |
 | `loss.onset_weight` | `ONSET_LOSS_WEIGHT` |
+| `loss.pn_head_weight` | `PN_HEAD_LOSS_WEIGHT` |
+| `loss.pn_head_pos_weight` | `PN_HEAD_POS_WEIGHT` |
 | `eval.*` | `EVAL_*`, `THRESHOLD_*`, `FAILURE_*` |
 | `runtime.cuda_device` | `CUDA_VISIBLE_DEVICES` |
 
@@ -204,7 +239,8 @@ experiments:
 | A1 | + FPT | `use_fpt: true`, `best_checkpoint_metric: ipt` |
 | A2 | + FPT + combined ckpt | `configs/fpt_combined_pn.yaml` |
 | A3 | + FPT + pn_frame ckpt | `configs/fpt_pn_frame.yaml` |
-| A4 | + focal loss（待实现） | 复制 A3，改 `loss.ipt_loss` |
+| A4 | + FPT + PN head | `configs/fpt_pn_head.yaml` |
+| A5 | + focal loss（待实现） | 复制 A4，改 `loss.ipt_loss` |
 
 流程：
 
@@ -243,6 +279,7 @@ python test_train_frame_ao --run runs/guzheng/...  # 需传参，见 scripts/tes
 | `configs/baseline.yaml` | Baseline 实验配置 |
 | `configs/fpt_combined_pn.yaml` | FPT + combined checkpoint |
 | `configs/fpt_pn_frame.yaml` | FPT + PN-frame-weighted checkpoint |
+| `configs/fpt_pn_head.yaml` | FPT + PN discriminator head + pn_frame ckpt |
 | `experiments/registry.yaml` | 实验登记册 |
 | `experiments/WORKFLOW.md` | 本文档 |
 | `scripts/train.py` | 统一训练入口 |

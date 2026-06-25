@@ -28,3 +28,10 @@ experiments:
     run_dir: null
     checkpoint: null
     notes: "FPT with pn_frame ckpt (IPT + pitch + 2*PN frame) / 4."
+
+  - id: fpt_pn_head
+    status: planned
+    config: configs/fpt_pn_head.yaml
+    run_dir: null
+    checkpoint: null
+    notes: "FPT + PNHead (pluck-conditioned) + pn_frame ckpt; targets PN vs vibrato confusion."

@@ -32,6 +32,17 @@ FPT_NUM_LAYERS = 1
 FPT_NUM_HEADS = 8
 FPT_DROPOUT = 0.1
 
+# --- Optional PN discriminator head (dedicated PN vs vibrato/plucks) ---
+USE_PN_HEAD = False
+PN_HEAD_CONTEXT = 5  # temporal conv radius (frames each side)
+PN_HEAD_HIDDEN = 256
+PN_HEAD_DROPOUT = 0.2
+PN_HEAD_USE_PLUCK_GATE = True
+PN_HEAD_USE_ONSET_GATE = False
+PN_FUSION_ALPHA = 0.7  # blend: alpha * PN_head + (1-alpha) * IPT channel 6
+PN_IDX = 6  # dianyin / PN row in IPT_label
+PLUCKS_IDX = 1  # boxian / plucks row
+
 # Checkpoint / early stopping (overridden per experiment in configs/*.yaml)
 ENABLE_EARLY_STOPPING = True
 BEST_CHECKPOINT_METRIC = "combined"
@@ -39,6 +50,8 @@ BEST_CHECKPOINT_METRIC = "combined"
 # Training loss: loss + PITCH_LOSS_WEIGHT * loss_p + ONSET_LOSS_WEIGHT * loss_o
 PITCH_LOSS_WEIGHT = 0.5
 ONSET_LOSS_WEIGHT = 1.0
+PN_HEAD_LOSS_WEIGHT = 2.0
+PN_HEAD_POS_WEIGHT = 5.0  # BCE weight on positive PN frames
 
 saveName = "mul_onset7_pitch_IPT_share_weight_weighted_loss-" + URL.split("/")[-1] #name of the model to save and load
 DATASET = "Guzheng_Tech99"

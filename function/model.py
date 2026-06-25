@@ -2,9 +2,10 @@ import torch.nn.functional as F
 import sys
 sys.path.append('../fun')
 import torch
+from typing import Optional
 from transformers import AutoModel
 from torch import nn
-from config import *
+import config
 
 class TemporalPyramidTransformer(nn.Module):
     """
@@ -95,6 +96,56 @@ class TemporalPyramidTransformer(nn.Module):
         return x_fused
 
 
+class PNHead(nn.Module):
+    """
+    Dedicated PN (dianyin) frame classifier with local temporal context and
+    optional pluck/onset conditioning. Output logits [B, T].
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        context: int = 5,
+        hidden: int = 256,
+        dropout: float = 0.2,
+        use_pluck_gate: bool = True,
+        use_onset_gate: bool = False,
+    ):
+        super().__init__()
+        self.use_pluck_gate = use_pluck_gate
+        self.use_onset_gate = use_onset_gate
+        kernel = 2 * context + 1
+        self.ctx_conv = nn.Conv1d(d_model, d_model, kernel_size=kernel, padding=context)
+        if use_pluck_gate:
+            self.pluck_gate = nn.Linear(1, d_model)
+        if use_onset_gate:
+            self.onset_gate = nn.Linear(1, d_model)
+        self.classifier = nn.Sequential(
+            nn.Linear(d_model, hidden),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, 1),
+        )
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        pluck_prob: Optional[torch.Tensor] = None,
+        onset_prob: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        # x: [B, T, D]
+        h = self.ctx_conv(x.transpose(1, 2)).transpose(1, 2)
+        if self.use_pluck_gate and pluck_prob is not None:
+            if pluck_prob.dim() == 3:
+                pluck_prob = pluck_prob.squeeze(-1)
+            h = h + self.pluck_gate(pluck_prob.unsqueeze(-1))
+        if self.use_onset_gate and onset_prob is not None:
+            if onset_prob.dim() == 3:
+                onset_prob = onset_prob.squeeze(-1)
+            h = h + self.onset_gate(onset_prob.unsqueeze(-1))
+        return self.classifier(h).squeeze(-1)
+
+
 class SSLNet(nn.Module):
     def __init__(self,
                  url,
@@ -111,19 +162,31 @@ class SSLNet(nn.Module):
         # Optional Feature Pyramid Transformer (Option A): x -> x_fused (same shape)
         feature_dim = 1024 if encode_size == 24 else 768
         self.fpt = None
-        if USE_FPT:
+        if config.USE_FPT:
             self.fpt = TemporalPyramidTransformer(
                 d_model=feature_dim,
-                num_levels=FPT_LEVELS,
-                num_layers_per_level=FPT_NUM_LAYERS,
-                nhead=FPT_NUM_HEADS,
-                dropout=FPT_DROPOUT,
+                num_levels=config.FPT_LEVELS,
+                num_layers_per_level=config.FPT_NUM_LAYERS,
+                nhead=config.FPT_NUM_HEADS,
+                dropout=config.FPT_DROPOUT,
             )
 
         self.backend = Backend(class_num, encoder_size=encode_size)
         self.backend_onset = Backend(1, encoder_size=encode_size)
-        self.backend_attnet_IPT =Backend_Attnet(NUM_LABELS,NUM_LABELS+1)
-        self.backend_attnet_pitch = Backend_Attnet(MAX_MIDI-MIN_MIDI+1,MAX_MIDI-MIN_MIDI+1+1)
+        self.backend_attnet_IPT =Backend_Attnet(config.NUM_LABELS,config.NUM_LABELS+1)
+        self.backend_attnet_pitch = Backend_Attnet(config.MAX_MIDI-config.MIN_MIDI+1,config.MAX_MIDI-config.MIN_MIDI+1+1)
+
+        self.pn_head = None
+        if config.USE_PN_HEAD:
+            self.pn_head = PNHead(
+                d_model=feature_dim,
+                context=config.PN_HEAD_CONTEXT,
+                hidden=config.PN_HEAD_HIDDEN,
+                dropout=config.PN_HEAD_DROPOUT,
+                use_pluck_gate=config.PN_HEAD_USE_PLUCK_GATE,
+                use_onset_gate=config.PN_HEAD_USE_ONSET_GATE,
+            )
+        self._pn_aux_logit = None
 
     def forward(self, x):
         x = x.squeeze(dim=1)
@@ -132,7 +195,7 @@ class SSLNet(nn.Module):
             x = self.fpt(x)  # [B, T_mert, D] (x_fused)
         out, feature = self.backend(x) #[batch, time, class_num]
         sizes = out.size()
-        out = out.view(sizes[0], sizes[1], NUM_LABELS, MAX_MIDI - MIN_MIDI + 1)
+        out = out.view(sizes[0], sizes[1], config.NUM_LABELS, config.MAX_MIDI - config.MIN_MIDI + 1)
         IPT_pred =  torch.sum(out, dim=3)  # [batch, time, IPT]
         pitch_pred = torch.sum(out, dim=2) # [batch, time, pitch]
         onset_pred, _ = self.backend_onset(x) #[batch, time, class_num]
@@ -145,6 +208,21 @@ class SSLNet(nn.Module):
         pitch_pred_out = self.backend_attnet_pitch(pitch_onset_cat).transpose(-1,-2)
         onset_pred_out = onset_pred.transpose(-1,-2)
 
+        self._pn_aux_logit = None
+        if self.pn_head is not None:
+            pluck_prob = torch.sigmoid(IPT_pred[:, :, config.PLUCKS_IDX].detach())
+            onset_prob = None
+            if config.PN_HEAD_USE_ONSET_GATE:
+                onset_prob = torch.sigmoid(onset_pred_deta.squeeze(-1))
+            pn_aux = self.pn_head(x, pluck_prob, onset_prob)
+            self._pn_aux_logit = pn_aux
+            fused_pn = (
+                config.PN_FUSION_ALPHA * pn_aux
+                + (1.0 - config.PN_FUSION_ALPHA) * IPT_pred_out[:, config.PN_IDX, :]
+            )
+            IPT_pred_out = IPT_pred_out.clone()
+            IPT_pred_out[:, config.PN_IDX, :] = fused_pn
+
         return IPT_pred_out,pitch_pred_out,onset_pred_out
 
 
@@ -152,7 +230,7 @@ class HuggingfaceFrontend(nn.Module):
     def __init__(self, url, use_last=False, encoder_size=12, freeze_all=False):
         super().__init__()
         print("url is：",url)
-        self.model = AutoModel.from_pretrained(URL, trust_remote_code=True)
+        self.model = AutoModel.from_pretrained(config.URL, trust_remote_code=True)
         if freeze_all:
             for param in self.model.parameters():
                 param.requires_grad = False

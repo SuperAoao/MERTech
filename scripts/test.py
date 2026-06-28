@@ -28,6 +28,8 @@ from experiment_config import (  # noqa: E402
     REPO_ROOT,
     apply_experiment_config,
     find_best_checkpoint,
+    load_experiment_config,
+    load_sslnet_state_dict,
     resolve_config_for_run,
 )
 from load_data import load  # noqa: E402
@@ -158,8 +160,7 @@ def main() -> None:
         weight_sum=1,
         freeze_all=config_mod.FREEZE_ALL,
     ).to(config_mod.device)
-    state_dict = torch.load(checkpoint_path, map_location="cpu")
-    model.load_state_dict(state_dict)
+    load_sslnet_state_dict(model, checkpoint_path)
     model.eval()
     print("finishing loading model")
 

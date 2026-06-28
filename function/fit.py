@@ -291,8 +291,12 @@ class Trainer:
             extra = {
                 "legacy_ipt_frame_f1": float(eva_result[3]),
                 "legacy_pitch_frame_f1": float(eva_result[7]),
+                "valid_onset_loss": float(eva_result[8]),
                 **ckpt_details,
             }
+            if val_bundle.get("onset") is not None:
+                extra["onset_frame_f1"] = float(val_bundle["onset"]["frame"]["f1"])
+                extra["onset_peak_f1"] = float(val_bundle["onset"]["peak"]["f1"])
         append_metrics_jsonl(self.metrics_log_path, epoch, val_bundle, extra=extra)
 
     def fit(self, tr_loader, va_loader, we):
@@ -309,6 +313,8 @@ class Trainer:
         viz.line([[0.0]], [0], win="pitch_recall_" + saveName, opts=dict(title="pitch_recall_" + saveName, legend=['valid_pitch_recall']))
         viz.line([[0.0]], [0], win="pitch_F1_" + saveName, opts=dict(title="pitch_F1_" + saveName, legend=['valid_pitch_F1']))
         viz.line([[0.0, 0.0]], [0], win="onset_loss_" + saveName, opts=dict(title="onset_loss_" + saveName, legend=['train_loss', 'valid_loss']))
+        viz.line([[0.0]], [0], win="onset_frame_F1_" + saveName, opts=dict(title="onset_frame_F1_" + saveName, legend=['onset_frame_F1']))
+        viz.line([[0.0]], [0], win="onset_peak_F1_" + saveName, opts=dict(title="onset_peak_F1_" + saveName, legend=['onset_peak_F1']))
         viz.line([[0.0]], [0], win="IPT_event_MA_" + saveName, opts=dict(title="IPT_event_MA_" + saveName, legend=['event_MA_F1']))
         viz.line([[0.0]], [0], win="IPT_frame_MA_" + saveName, opts=dict(title="IPT_frame_MA_" + saveName, legend=['frame_MA_F1']))
         viz.line([[0.0]], [0], win="macro_note_f1_" + saveName, opts=dict(title="macro_note_f1_" + saveName, legend=['macro_note_f1']))
@@ -423,6 +429,19 @@ class Trainer:
                     win="onset_loss_" + saveName,
                     update='append',
                 )
+                if val_bundle.get("onset") is not None:
+                    viz.line(
+                        [[float(val_bundle["onset"]["frame"]["f1"])]],
+                        [e - 1],
+                        win="onset_frame_F1_" + saveName,
+                        update='append',
+                    )
+                    viz.line(
+                        [[float(val_bundle["onset"]["peak"]["f1"])]],
+                        [e - 1],
+                        win="onset_peak_F1_" + saveName,
+                        update='append',
+                    )
                 viz.line(
                     [[float(ipt["frame"]["macro_f1"])]],
                     [e - 1],
@@ -439,6 +458,12 @@ class Trainer:
 
                 print("IPT_F1 (legacy multipitch):", eva_result[3])
                 print("pitch_F1:", eva_result[7])
+                if val_bundle.get("onset") is not None:
+                    onset_m = val_bundle["onset"]
+                    print(
+                        "onset frame F1: %.4f  onset peak F1: %.4f"
+                        % (onset_m["frame"]["f1"], onset_m["peak"]["f1"])
+                    )
                 print(
                     "note F1 (after post-proc): %.4f  macro_note_f1: %.4f"
                     % (

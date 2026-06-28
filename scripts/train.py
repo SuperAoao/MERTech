@@ -23,6 +23,7 @@ from experiment_config import (  # noqa: E402
     finalize_run_meta,
     find_best_checkpoint,
     load_experiment_config,
+    load_sslnet_state_dict,
     snapshot_run,
 )
 from fit import Trainer  # noqa: E402
@@ -151,6 +152,19 @@ def main() -> None:
             config_mod.BEST_CHECKPOINT_METRIC,
         )
     )
+    if config_mod.USE_PN_HEAD:
+        print(
+            "[PN head] context=%d hidden=%d fusion_alpha=%.2f "
+            "loss_weight=%.2f pos_weight=%.1f pluck_gate=%s"
+            % (
+                config_mod.PN_HEAD_CONTEXT,
+                config_mod.PN_HEAD_HIDDEN,
+                config_mod.PN_FUSION_ALPHA,
+                config_mod.PN_HEAD_LOSS_WEIGHT,
+                config_mod.PN_HEAD_POS_WEIGHT,
+                config_mod.PN_HEAD_USE_PLUCK_GATE,
+            )
+        )
 
     model = SSLNet(
         url=config_mod.URL,

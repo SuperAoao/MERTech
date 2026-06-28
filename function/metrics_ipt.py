@@ -52,6 +52,137 @@ def accumulate_frame_counts(pred_bin: np.ndarray, tar_bin: np.ndarray) -> Tuple[
     return tp, fp, fn
 
 
+def prf_from_counts(tp: int, fp: int, fn: int) -> Dict[str, float]:
+    p = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    r = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = f1_from_counts(tp, fp, fn)
+    return {"precision": p, "recall": r, "f1": f1, "tp": tp, "fp": fp, "fn": fn}
+
+
+def _flatten_onset_1d(onset: np.ndarray) -> np.ndarray:
+    """Normalize onset array to 1D float32 of length T."""
+    arr = np.asarray(onset, dtype=np.float32)
+    if arr.ndim == 2:
+        arr = arr[0]
+    elif arr.ndim > 2:
+        raise ValueError(f"onset array must be 1D or (1, T), got shape {arr.shape}")
+    return arr.reshape(-1)
+
+
+def onset_peak_indices(onset_bin: np.ndarray) -> np.ndarray:
+    """
+    Rising-edge onset peaks (matches extract_notes onset_diff logic).
+    onset_bin: (T,) values in {0, 1}.
+    """
+    m = onset_bin.astype(bool)
+    if m.size == 0:
+        return np.zeros((0,), dtype=np.int64)
+    rising = np.zeros(m.shape[0], dtype=bool)
+    rising[0] = m[0]
+    if m.shape[0] > 1:
+        rising[1:] = m[1:] & ~m[:-1]
+    return np.flatnonzero(rising).astype(np.int64)
+
+
+def match_onset_peaks(
+    pred_peaks: np.ndarray,
+    tar_peaks: np.ndarray,
+    tolerance_frames: int,
+) -> Tuple[int, int, int]:
+    """
+    Greedy one-to-one peak matching within ±tolerance_frames.
+    Returns (tp, fp, fn).
+    """
+    pred_peaks = np.asarray(pred_peaks, dtype=np.int64).reshape(-1)
+    tar_peaks = np.asarray(tar_peaks, dtype=np.int64).reshape(-1)
+    if tar_peaks.size == 0 and pred_peaks.size == 0:
+        return 0, 0, 0
+
+    pred_used = np.zeros(pred_peaks.shape[0], dtype=bool)
+    tp = 0
+    for t_peak in tar_peaks:
+        if pred_peaks.size == 0:
+            break
+        dist = np.abs(pred_peaks - t_peak)
+        order = np.argsort(dist)
+        matched = False
+        for j in order:
+            if pred_used[j]:
+                continue
+            if dist[j] <= tolerance_frames:
+                pred_used[j] = True
+                tp += 1
+                matched = True
+                break
+        if not matched:
+            pass  # counted as fn below
+
+    fn = int(tar_peaks.size) - tp
+    fp = int(pred_peaks.size) - tp
+    return tp, fp, fn
+
+
+def evaluate_onset_chunks(
+    pred_onset_chunks: Sequence[np.ndarray],
+    tar_onset_chunks: Sequence[np.ndarray],
+    *,
+    onset_th: float = 0.5,
+    tar_th: float = 0.5,
+    peak_tolerance_seconds: float = 0.05,
+) -> Dict:
+    """
+    Shared-onset head metrics on validation / test chunks.
+
+    - frame: per-frame binary onset activation (micro P/R/F1)
+    - peak: rising-edge onset peaks with tolerance (drives event segmentation)
+    """
+    assert len(pred_onset_chunks) == len(tar_onset_chunks)
+    tolerance_frames = max(0, int(round(peak_tolerance_seconds * FEATURE_RATE)))
+
+    frame_tp = frame_fp = frame_fn = 0
+    peak_tp = peak_fp = peak_fn = 0
+    n_tar_peaks = n_pred_peaks = 0
+
+    for pred_onset, tar_onset in zip(pred_onset_chunks, tar_onset_chunks):
+        pred_1d = _flatten_onset_1d(pred_onset)
+        tar_1d = _flatten_onset_1d(tar_onset)
+        t_len = min(pred_1d.shape[0], tar_1d.shape[0])
+        pred_1d = pred_1d[:t_len]
+        tar_1d = tar_1d[:t_len]
+
+        pred_bin = (pred_1d > onset_th).astype(np.uint8)
+        tar_bin = (tar_1d > tar_th).astype(np.uint8)
+
+        tp, fp, fn = accumulate_frame_counts(
+            pred_bin.reshape(1, -1),
+            tar_bin.reshape(1, -1),
+        )
+        frame_tp += tp
+        frame_fp += fp
+        frame_fn += fn
+
+        pred_peaks = onset_peak_indices(pred_bin)
+        tar_peaks = onset_peak_indices(tar_bin)
+        n_pred_peaks += int(pred_peaks.size)
+        n_tar_peaks += int(tar_peaks.size)
+        ptp, pfp, pfn = match_onset_peaks(pred_peaks, tar_peaks, tolerance_frames)
+        peak_tp += ptp
+        peak_fp += pfp
+        peak_fn += pfn
+
+    return {
+        "frame": prf_from_counts(frame_tp, frame_fp, frame_fn),
+        "peak": prf_from_counts(peak_tp, peak_fp, peak_fn),
+        "threshold": float(onset_th),
+        "tar_threshold": float(tar_th),
+        "peak_tolerance_seconds": float(peak_tolerance_seconds),
+        "peak_tolerance_frames": int(tolerance_frames),
+        "n_chunks": len(pred_onset_chunks),
+        "n_pred_peaks": n_pred_peaks,
+        "n_tar_peaks": n_tar_peaks,
+    }
+
+
 def events_from_shared_onset(
     onset_prob: np.ndarray,
     frame_prob: np.ndarray,
@@ -546,11 +677,19 @@ def run_full_validation_metrics(
         frame_th=default_frame_th,
     )
 
+    onset_metrics = evaluate_onset_chunks(
+        pred_onset_chunks,
+        tar_onset_chunks,
+        onset_th=default_onset_th,
+        peak_tolerance_seconds=onset_tolerance,
+    )
+
     return {
         "ipt_default_thresholds": ipt_default,
         "ipt_swept_thresholds": ipt_tuned,
         "threshold_sweep": sweep,
         "prepost": prepost,
+        "onset": onset_metrics,
     }
 
 
@@ -593,6 +732,30 @@ def format_prepost_report(prepost: Dict) -> str:
     return "\n".join(lines)
 
 
+def format_onset_report(onset: Dict, title: str = "ONSET metrics (shared onset head)") -> str:
+    """Human-readable onset frame + peak block."""
+    fr = onset["frame"]
+    pk = onset["peak"]
+    lines = [
+        "=" * 72,
+        title,
+        "=" * 72,
+        f"threshold: onset_th={onset['threshold']:.2f}  "
+        f"peak_tolerance={onset['peak_tolerance_seconds']:.3f}s "
+        f"({onset['peak_tolerance_frames']} frames)",
+        "-" * 72,
+        f"FRAME  onset activation   P: {fr['precision'] * 100:5.1f}%  "
+        f"R: {fr['recall'] * 100:5.1f}%  F1: {fr['f1'] * 100:5.1f}%  "
+        f"(tp={fr['tp']} fp={fr['fp']} fn={fr['fn']})",
+        f"PEAK   onset rising-edge  P: {pk['precision'] * 100:5.1f}%  "
+        f"R: {pk['recall'] * 100:5.1f}%  F1: {pk['f1'] * 100:5.1f}%  "
+        f"(tp={pk['tp']} fp={pk['fp']} fn={pk['fn']})",
+        f"       peaks pred/ref: {onset['n_pred_peaks']} / {onset['n_tar_peaks']}",
+        "=" * 72,
+    ]
+    return "\n".join(lines)
+
+
 def format_threshold_sweep_report(sweep: Optional[Dict]) -> str:
     if sweep is None:
         return ""
@@ -620,6 +783,13 @@ def format_full_evaluation_report(
             title=f"IPT metrics @ default thresholds{title_suffix}",
         )
     )
+    if bundle.get("onset") is not None:
+        parts.append(
+            format_onset_report(
+                bundle["onset"],
+                title=f"ONSET metrics @ default threshold{title_suffix}",
+            )
+        )
     if bundle.get("ipt_swept_thresholds") is not bundle.get("ipt_default_thresholds"):
         parts.append(
             format_ipt_metrics_report(
@@ -688,12 +858,30 @@ def metrics_to_json_serializable(metrics: Dict) -> Dict:
     return out
 
 
+def onset_to_json_serializable(onset: Dict) -> Dict:
+    return {
+        "frame": {k: float(v) if k in ("precision", "recall", "f1") else int(v)
+                  for k, v in onset["frame"].items()},
+        "peak": {k: float(v) if k in ("precision", "recall", "f1") else int(v)
+                 for k, v in onset["peak"].items()},
+        "threshold": float(onset["threshold"]),
+        "tar_threshold": float(onset["tar_threshold"]),
+        "peak_tolerance_seconds": float(onset["peak_tolerance_seconds"]),
+        "peak_tolerance_frames": int(onset["peak_tolerance_frames"]),
+        "n_chunks": int(onset["n_chunks"]),
+        "n_pred_peaks": int(onset["n_pred_peaks"]),
+        "n_tar_peaks": int(onset["n_tar_peaks"]),
+    }
+
+
 def bundle_to_json_serializable(bundle: Dict) -> Dict:
     """Full validation / test bundle for json logging."""
     out = {
         "ipt_default": metrics_to_json_serializable(bundle["ipt_default_thresholds"]),
         "prepost": bundle["prepost"],
     }
+    if bundle.get("onset") is not None:
+        out["onset"] = onset_to_json_serializable(bundle["onset"])
     if bundle.get("ipt_swept_thresholds") is not None:
         out["ipt_swept"] = metrics_to_json_serializable(bundle["ipt_swept_thresholds"])
     if bundle.get("threshold_sweep") is not None:

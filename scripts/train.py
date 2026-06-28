@@ -144,10 +144,11 @@ def main() -> None:
             )
         )
     print(
-        "[FPT] enabled=%s%s | early_stop=%s best_metric=%s"
+        "[FPT] enabled=%s%s | onset_bypass=%s | early_stop=%s best_metric=%s"
         % (
             config_mod.USE_FPT,
             fpt_extra,
+            config_mod.USE_FPT_ONSET_BYPASS and config_mod.USE_FPT,
             config_mod.ENABLE_EARLY_STOPPING,
             config_mod.BEST_CHECKPOINT_METRIC,
         )

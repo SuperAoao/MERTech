@@ -31,6 +31,8 @@ FPT_NUM_LAYERS = 1
 # attention heads (must divide MERT hidden dim: 768/1024)
 FPT_NUM_HEADS = 8
 FPT_DROPOUT = 0.1
+# Route onset head from raw MERT features while IPT/pitch use FPT output (requires USE_FPT).
+USE_FPT_ONSET_BYPASS = False
 
 # --- Optional PN discriminator head (dedicated PN vs vibrato/plucks) ---
 USE_PN_HEAD = False

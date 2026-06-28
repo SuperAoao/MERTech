@@ -35,3 +35,10 @@ experiments:
     run_dir: null
     checkpoint: null
     notes: "FPT + PNHead (pluck-conditioned) + pn_frame ckpt; targets PN vs vibrato confusion."
+
+  - id: fpt_onset_bypass
+    status: planned
+    config: configs/fpt_onset_bypass.yaml
+    run_dir: null
+    checkpoint: null
+    notes: "FPT on IPT/pitch; onset from raw MERT. Ckpt=combined_onset (IPT+pitch+PN+onset peak)."

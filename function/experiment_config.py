@@ -49,6 +49,7 @@ def default_experiment_dict() -> Dict[str, Any]:
             "fpt_num_layers": config_mod.FPT_NUM_LAYERS,
             "fpt_num_heads": config_mod.FPT_NUM_HEADS,
             "fpt_dropout": config_mod.FPT_DROPOUT,
+            "use_fpt_onset_bypass": config_mod.USE_FPT_ONSET_BYPASS,
             "use_pn_head": config_mod.USE_PN_HEAD,
             "pn_head_context": config_mod.PN_HEAD_CONTEXT,
             "pn_head_hidden": config_mod.PN_HEAD_HIDDEN,
@@ -140,6 +141,11 @@ def apply_experiment_config(cfg: Dict[str, Any], *, run_dir: Optional[str] = Non
     config_mod.FPT_NUM_LAYERS = int(model.get("fpt_num_layers", config_mod.FPT_NUM_LAYERS))
     config_mod.FPT_NUM_HEADS = int(model.get("fpt_num_heads", config_mod.FPT_NUM_HEADS))
     config_mod.FPT_DROPOUT = float(model.get("fpt_dropout", config_mod.FPT_DROPOUT))
+    config_mod.USE_FPT_ONSET_BYPASS = bool(
+        model.get("use_fpt_onset_bypass", config_mod.USE_FPT_ONSET_BYPASS)
+    )
+    if config_mod.USE_FPT_ONSET_BYPASS and not config_mod.USE_FPT:
+        print("Warning: use_fpt_onset_bypass=True ignored because use_fpt=False")
 
     config_mod.USE_PN_HEAD = bool(model.get("use_pn_head", config_mod.USE_PN_HEAD))
     config_mod.PN_HEAD_CONTEXT = int(model.get("pn_head_context", config_mod.PN_HEAD_CONTEXT))

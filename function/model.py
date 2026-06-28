@@ -190,15 +190,22 @@ class SSLNet(nn.Module):
 
     def forward(self, x):
         x = x.squeeze(dim=1)
-        x = self.frontend(x)  # [B, T_mert, D]
+        x_mert = self.frontend(x)  # [B, T_mert, D]
+        x_task = x_mert
         if self.fpt is not None:
-            x = self.fpt(x)  # [B, T_mert, D] (x_fused)
-        out, feature = self.backend(x) #[batch, time, class_num]
+            x_task = self.fpt(x_mert)  # [B, T_mert, D] IPT / pitch / PN head features
+
+        out, feature = self.backend(x_task) #[batch, time, class_num]
         sizes = out.size()
         out = out.view(sizes[0], sizes[1], config.NUM_LABELS, config.MAX_MIDI - config.MIN_MIDI + 1)
         IPT_pred =  torch.sum(out, dim=3)  # [batch, time, IPT]
         pitch_pred = torch.sum(out, dim=2) # [batch, time, pitch]
-        onset_pred, _ = self.backend_onset(x) #[batch, time, class_num]
+
+        use_onset_bypass = (
+            self.fpt is not None and config.USE_FPT_ONSET_BYPASS
+        )
+        x_onset = x_mert if use_onset_bypass else x_task
+        onset_pred, _ = self.backend_onset(x_onset) #[batch, time, class_num]
         onset_pred_deta = onset_pred.detach()
 
         IPT_onset_cat = torch.cat((IPT_pred, onset_pred_deta), 2)
@@ -214,7 +221,7 @@ class SSLNet(nn.Module):
             onset_prob = None
             if config.PN_HEAD_USE_ONSET_GATE:
                 onset_prob = torch.sigmoid(onset_pred_deta.squeeze(-1))
-            pn_aux = self.pn_head(x, pluck_prob, onset_prob)
+            pn_aux = self.pn_head(x_task, pluck_prob, onset_prob)
             self._pn_aux_logit = pn_aux
             fused_pn = (
                 config.PN_FUSION_ALPHA * pn_aux
